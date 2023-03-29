@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Initial version of MELT-RISC pipeline.
+
 import argparse
 import csv
 import gzip
