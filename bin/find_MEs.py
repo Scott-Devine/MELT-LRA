@@ -254,6 +254,10 @@ def read_water(wfile):
                     alignment['length'] = int(m.group(2))
                     alignment['pct_id'] = float(m.group(3))
 
+                m = re.match(r'^# Gaps:\s+(\d+)\/(\d+) \((\s*[\d\.]+)%\)', line)
+                if m:
+                    alignment['gaps'] = int(m.group(1))
+
                 m = re.match(r'^#=======================================\s*$', line)
                 if alignment is not None and 'ME' in alignment and m:
                     reading_match_lines = True if not reading_match_lines else False
@@ -309,7 +313,7 @@ def check_insertion_for_tsd(ins, ref_seqs):
     #
     return { 'tsd': None, 'len': 0 }
 
-def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand):
+def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, min_pctcov, strand):
     ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len']-1)
     if ins_name not in aligns:
         # ugh
@@ -318,13 +322,21 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand)
             fatal("no alignment found for " + ins_name)
     al = aligns[ins_name]
     me_match = None
-    if al['pct_id'] >= min_pctid:
+
+    # compute percent identity without gaps
+    pctid_nogaps = (al['matches'] / (al['length'] - al['gaps'])) * 100.0
+    
+    debug("checking " + ins_name + " for match, al=" + str(al))
+    if (al['pct_id'] >= min_pctid) and (pctid_nogaps >= min_pctid_nogaps):
+        debug("checking " + ins_name + " for match, pctid is good ")
         # TODO - pctcov shouldn't include TSD or polyA
 #        available_bp = vcf_ins['len'] - vcf_ins['tsd']['len']
         available_bp = vcf_ins['len']
         ins_pctcov = (al['length'] / available_bp) * 100.0
         me_pctcov =  (al['length'] / ME_LENGTHS[al['ME']]) * 100.0
+        debug("checking " + ins_name + " for match, ins_pctcov=" + str(ins_pctcov) + " me_pctcov=" + str(me_pctcov))
         if ins_pctcov >= min_pctcov:
+            debug("checking " + ins_name + " for match, ins_pctcov is good, setting match to nonempty")
             me_match = { 'ME': al['ME'], 'pctid':al['pct_id'], 'ins_pctcov': ins_pctcov, 'me_pctcov': me_pctcov, 'alignment': al, 'strand': strand }
     return me_match
 
@@ -450,9 +462,10 @@ def main():
     parser.add_argument('--sva_water_rev', required=True, help='Path to SVA water reverse strand alignment output file.')
     parser.add_argument('--line_water', required=True, help='Path to LINE1 water alignment output file.')
     parser.add_argument('--line_water_rev', required=True, help='Path to LINE1 water reverse strand alignment output file.')
-    parser.add_argument('--min_seqlen', required=False, type=int, default=1, help='Minimum insertion sequence length.')
-    parser.add_argument('--min_pctid', required=False, type=int, default=1, help='Minimum percent identity of alignment.')
-    parser.add_argument('--min_pctcov', required=False, type=int, default=1, help='Minimum percent coverage of alignment.')
+    parser.add_argument('--min_seqlen', required=False, type=int, default=100, help='Minimum insertion sequence length.')
+    parser.add_argument('--min_pctid', required=False, type=int, default=90, help='Minimum percent identity of alignment.')
+    parser.add_argument('--min_pctid_nogaps', required=False, type=int, default=90, help='Minimum percent identity of alignment ignoring gaps.')
+    parser.add_argument('--min_pctcov', required=False, type=int, default=85, help='Minimum percent coverage of alignment.')
     parser.add_argument('--seqid', required=False, help='Optional sequence id: process only insertions on this reference sequence.')
     parser.add_argument('--skip_seqids', required=False, help='Optional comma-delimited list of sequence ids to skip.')
     args = parser.parse_args()
@@ -507,12 +520,12 @@ def main():
             n_tsd += 1
 
         # check for qualifying match with mobile element
-        alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctcov, '+')
-        alu_rev_match = check_insertion_for_ME_match(vcf_ins, alu_rev_aligns, args.min_pctid, args.min_pctcov, '-')
-        sva_match = check_insertion_for_ME_match(vcf_ins, sva_aligns, args.min_pctid, args.min_pctcov, '+')
-        sva_rev_match = check_insertion_for_ME_match(vcf_ins, sva_rev_aligns, args.min_pctid, args.min_pctcov, '-')
-        line_match = check_insertion_for_ME_match(vcf_ins, line_aligns, args.min_pctid, args.min_pctcov, '+')
-        line_rev_match = check_insertion_for_ME_match(vcf_ins, line_rev_aligns, args.min_pctid, args.min_pctcov, '-')
+        alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
+        alu_rev_match = check_insertion_for_ME_match(vcf_ins, alu_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
+        sva_match = check_insertion_for_ME_match(vcf_ins, sva_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
+        sva_rev_match = check_insertion_for_ME_match(vcf_ins, sva_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
+        line_match = check_insertion_for_ME_match(vcf_ins, line_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
+        line_rev_match = check_insertion_for_ME_match(vcf_ins, line_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
         me_match = None
 
         # there should only be one qualifying match
@@ -521,6 +534,7 @@ def main():
                 if me_match is not None:
                     fatal("multiple ME matches")
                 me_match = m
+                debug("ME_match found for " + vcf_ins['chrom'] + ":" + str(vcf_ins['pos']) + " : " + str(me_match))
 
         vcf_ins['me_match'] = me_match
         if me_match is not None:
