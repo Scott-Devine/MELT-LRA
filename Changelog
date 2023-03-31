@@ -1,0 +1,5 @@
+v1.0.1 (? 2023)
+ -Added --min_pctid_nogaps option to filter MEIs using percent identity computed ignoring gaps.
+
+v1.0.0 (March 29, 2023)
+ -Initial release of MELT-RISC MEI identification pipeline.
