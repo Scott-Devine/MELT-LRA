@@ -24,9 +24,12 @@ csv.field_size_limit(256 * 1024 * 1024)
 MIN_TSD_LEN = 5
 MAX_TSD_LEN = 25
 
+# perl -e 'while (<>) { chomp; if (!(/^>/)) { $l += length($_);} } print "length=$l\n"' <SVA_A.fa 
 ME_LENGTHS = {
     'ALU': 281,
-    'SVA': 1316,
+    'SVA': 1316,    # MELT SVA reference
+    'SVA_A': 1387,
+    'SVA_F': 1375,
     'LINE1': 6019
 }
 
