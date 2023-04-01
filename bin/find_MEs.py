@@ -261,6 +261,10 @@ def read_water(wfile):
                 if m:
                     alignment['gaps'] = int(m.group(1))
 
+                m = re.match(r'^# Score: ([\d\.]+).*$', line)
+                if m:
+                    alignment['score'] = float(m.group(1))
+
                 m = re.match(r'^#=======================================\s*$', line)
                 if alignment is not None and 'ME' in alignment and m:
                     reading_match_lines = True if not reading_match_lines else False
@@ -529,16 +533,18 @@ def main():
         sva_rev_match = check_insertion_for_ME_match(vcf_ins, sva_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
         line_match = check_insertion_for_ME_match(vcf_ins, line_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
         line_rev_match = check_insertion_for_ME_match(vcf_ins, line_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
+        matches = [m for m in [alu_match, alu_rev_match, sva_match, sva_rev_match, line_match, line_rev_match] if m is not None]
+        n_matches = len(matches)
+
+        # sort matches and pick the highest-scoring
         me_match = None
-
-        # there should only be one qualifying match
-        for m in (alu_match, alu_rev_match, sva_match, sva_rev_match, line_match, line_rev_match):
-            if m is not None:
-                if me_match is not None:
-                    fatal("multiple ME matches")
-                me_match = m
-                debug("ME_match found for " + vcf_ins['chrom'] + ":" + str(vcf_ins['pos']) + " : " + str(me_match))
-
+        if n_matches > 0:
+            sorted_matches = sorted(matches, key = lambda x: x['alignment']['score'], reverse=True)
+            me_match = sorted_matches[0]
+            # kick the can down the road
+            if n_matches > 1 and sorted_matches[0]['alignment']['score'] == sorted_matches[1]['alignment']['score']:
+                fatal("multiple qualifying matches with the same score: " + str(sorted_matches))
+                
         vcf_ins['me_match'] = me_match
         if me_match is not None:
             n_me_match += 1
