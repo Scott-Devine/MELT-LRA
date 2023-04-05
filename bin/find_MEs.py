@@ -20,9 +20,8 @@ DEBUG = False
 # increase CSV max field size
 csv.field_size_limit(256 * 1024 * 1024)
 
-# TODO - parameterize/check this
-MIN_TSD_LEN = 5
-MAX_TSD_LEN = 25
+MIN_TSD_LEN = 1
+MAX_TSD_LEN = 40
 
 # perl -e 'while (<>) { chomp; if (!(/^>/)) { $l += length($_);} } print "length=$l\n"' <SVA_A.fa 
 ME_LENGTHS = {
@@ -280,45 +279,54 @@ def read_water(wfile):
 # check_insertion_for_tsd
 # ------------------------------------------------------
 def check_insertion_for_tsd(ins, ref_seqs):
+    ref_seq = ref_seqs[ins['chrom']]
+    ref_seq_len = ref_seq['len']
+    ins_seq = ins['ins']
+    ins_seq_len = len(ins_seq)
 
     # find longest TSD _after_ the insertion
 
     # forward strand:
-    # [TSD........polyA]TSD
+    # [<TSD>........polyA]<TSD>
     #
     # reverse strand:
-    # [TSDpolyT........]TSD
+    # [<TSD>polyT........]<TSD>
     #
     # [] = inserted sequence
 
-    ref_seq = ref_seqs[ins['chrom']]
-    ref_seq_len = ref_seq['len']
+    # TODO - note that this situation is possible too, but it depends on the insertion caller
+    # where the 5' TSD appears wrt to the called insertion. PAV always seems to place the
+    # 5' TSD inside the insertion
+    #
+    # <TSD>][........polyA<TSD>]
+    
     ref_seq_pos = ins['pos']
-
-    # first base of ALT is the reference base
-    ins_seq = ins['ins']
-    ins_seq_len = len(ins_seq)
     ins_seq_pos = 0
+    tsd_after = ''
 
-    tsd = ''
     while ref_seq['seq'][ref_seq_pos].upper() == ins_seq[ins_seq_pos].upper():
-        tsd = tsd + ref_seq['seq'][ref_seq_pos]
+        tsd_after = tsd_after + ref_seq['seq'][ref_seq_pos]
         ref_seq_pos += 1
         ins_seq_pos += 1
-        if ref_seq_pos >= ref_seq_len:
+        if ref_seq_pos >= ref_seq_len or ins_seq_pos >= ins_seq_len:
             break
-        if ins_seq_pos >= ins_seq_len:
+
+    # find longest TSD _before_ the insertion:
+    # <TSD>][........polyA<TSD>]
+    ref_seq_pos = ins['pos'] - 1
+    ins_seq_pos = ins_seq_len - 1
+    tsd_before = ''
+    while ref_seq['seq'][ref_seq_pos].upper() == ins_seq[ins_seq_pos].upper():
+        tsd_before = ref_seq['seq'][ref_seq_pos] + tsd_before
+        ref_seq_pos -= 1
+        ins_seq_pos -= 1
+        if ref_seq_pos < 0 or ins_seq_pos < 0:
             break
-    tsd_len = len(tsd)
 
-    if tsd_len >= MIN_TSD_LEN and tsd_len <= MAX_TSD_LEN:
-        return { 'tsd': tsd, 'len': tsd_len }
-
-    # TODO - does this ever happen or is the genomic TSD always 3' of the insertion?
-    # find longest TSD _before_ the insertion?
-    # TSD[........TSD]
-    #
-    return { 'tsd': None, 'len': 0 }
+    return {
+        'before': { 'tsd': tsd_before, 'len': len(tsd_before) },
+        'after': { 'tsd': tsd_after, 'len': len(tsd_after) },
+    }
 
 def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, min_pctcov, strand):
     ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len']-1)
@@ -355,7 +363,7 @@ def check_insertion_for_polyA(vcf_ins):
         end = start
         plen = 0
         
-        while ins[end] == base and (end >= 0) and (end < len(ins)):
+        while (end >= 0) and (end < len(ins)) and ins[end] == base:
             end += offset
             plen += 1
 
@@ -366,7 +374,7 @@ def check_insertion_for_polyA(vcf_ins):
     # 1. search backwards from end of insertion sequence for polyA
     vcf_ins['polyA'] = find_polyX('A', len(ins) - 1, -1)
     # 2. search forwards from start of insertion sequence for polyT
-    vcf_ins['polyT'] = find_polyX('T', vcf_ins['tsd']['len'], 1)
+    vcf_ins['polyT'] = find_polyX('T', vcf_ins['tsds']['after']['len'], 1)
 
 # ------------------------------------------------------
 # print_insertion()
@@ -392,7 +400,7 @@ def print_insertion(ins, ref_seqs):
     if seq_before[-1].upper() != ins['ref']:
         fatal("seq_before[-1] (" + seq_before[-1] + ") != REF (" + ins['ref'] + ")")
 
-    tsd_str = ins['tsd']['tsd'] if ins['tsd']['tsd'] is not None else '-'
+    tsd_str = ins['tsds']['after']['tsd'] if ins['tsds']['after']['tsd'] is not None else '-'
     pos_str = (ins['chrom'] + ":" + str(ins['pos'])).ljust(16)
     # sequence to display inside the insertion
     l_bp = 45
@@ -420,9 +428,10 @@ def print_insertion(ins, ref_seqs):
     ins_str_middle = "".center(middle_bp)
     
     # TSD
-    tl = ins['tsd']['len']
+    tl = ins['tsds']['after']['len']
     if tl > 0:
-        rep = '<' + 'TSD'.center(tl-2, '-') + '>'
+        rep = '^' + 'TSD'.center(tl-2, '^') + '^'
+        rep = rep[0:tl]
         ins_str_left = rep.ljust(l_bp)[0:l_bp]
         seq_after = rep
 
@@ -452,6 +461,9 @@ def print_insertion(ins, ref_seqs):
     ins_right = ins_ld + ins['me_match']['ME'].rjust(x2 - x1 + 1, "-") + ins_rd + "".center(ins_len - x2) if x2 > (ins_len - r_bp) else "".center(r_bp)
     ins_str = ins_left[0:l_bp] + "".center(14) + ins_right[-r_bp:]
     print(pos_str + " " + me_str + "  " + seq_before + "  " + ins_str)
+    # DEBUG
+    if ins['tsds']['before']['tsd'] != "":
+        print("TSD before=" + ins['tsds']['before']['tsd'])
     print()
     
 # ------------------------------------------------------
@@ -517,14 +529,18 @@ def main():
 
     print("Location        |ME   |+/-|%ME   |%id   |%cov  | insertion")
 
-    n_tsd = 0
+    n_tsd_before = 0
+    n_tsd_after = 0
     n_me_match = 0
     for vcf_ins in vcf_insertions:
         # check for presence of target site duplication
-        tsd = check_insertion_for_tsd(vcf_ins, fasta_files)
-        vcf_ins['tsd'] = tsd
-        if tsd['tsd'] is not None:
-            n_tsd += 1
+        tsds = check_insertion_for_tsd(vcf_ins, fasta_files)
+        vcf_ins['tsds'] = tsds
+        
+        if tsds['before']['len'] >= MIN_TSD_LEN and tsds['before']['len'] <= MAX_TSD_LEN:
+            n_tsd_before += 1
+        if tsds['after']['len'] >= MIN_TSD_LEN and tsds['after']['len'] <= MAX_TSD_LEN:
+            n_tsd_after += 1
 
         # check for qualifying match with mobile element
         alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
@@ -548,17 +564,21 @@ def main():
         vcf_ins['me_match'] = me_match
         if me_match is not None:
             n_me_match += 1
+            # don't expect this to happen for PAV-called L1-mediated insertions:
+            if tsds['before']['len'] > tsds['after']['len']:
+                fatal("Longer TSD sequence found _before_ the insertion point.")
 
         # check for polyA/polyT
         polyA = check_insertion_for_polyA(vcf_ins)
-        
+
         # print insertions with ME match (but maybe no TSD)
         if me_match is not None:
             print_insertion(vcf_ins, fasta_files)
         
     # summary
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
-    info("found " + str(n_tsd) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs")
+    info("found " + str(n_tsd_before) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _before_ the insertion point")
+    info("found " + str(n_tsd_after) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _after_ the insertion point")
     info("found " + str(n_me_match) + " insertion(s) of length >= " + str(args.min_seqlen) + " with ME matches")
     
 if __name__ == '__main__':
