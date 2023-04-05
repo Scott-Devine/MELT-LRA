@@ -1,4 +1,6 @@
 v1.0.1 (? 2023)
+ -Look for TSD both before and after insertion, fail if longer TSD found before insertion.
+ -Remove restrictions on TSD length.
  -Add --min_pctid_nogaps option to filter MEIs using percent identity computed ignoring gaps.
  -Use alignment score to resolve cases where there are multiple qualifying ME alignments.
 
