@@ -367,14 +367,19 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
         # compute percent of the insertion covered by the ME alignment after removing TSD + polyX
         # these may overlap 
         remaining_bp = vcf_ins['len'] - tsd['len'] - polyX['len']
+
+        # alignment length in insertion and ME coords
+        al_len = al['insertion_coords']['x2'] - al['insertion_coords']['x1'] + 1
+        al_len_me = al['ME_coords']['x2'] - al['ME_coords']['x1'] + 1
+
         # NOTE - if we don't trim the portions of the alignment overlapping with the
         # polyX/TSD then we may get coverage > 100%. however, trimming is nontrivial
         # because the trimmed portion may include indels
-        rem_ins_pctcov = (al['length'] / remaining_bp) * 100.0
+        rem_ins_pctcov = (al_len / remaining_bp) * 100.0
 
         # percent of the _entire_ insertion covered by the ME alignment
-        ins_pctcov = (al['length'] / vcf_ins['len']) * 100.0
-        me_pctcov =  (al['length'] / ME_LENGTHS[al['ME']]) * 100.0
+        ins_pctcov = (al_len / vcf_ins['len']) * 100.0
+        me_pctcov =  (al_len_me / ME_LENGTHS[al['ME']]) * 100.0
         debug("checking " + ins_name + " for match, ins_pctcov=" + str(ins_pctcov) + " me_pctcov=" + str(me_pctcov))
         if rem_ins_pctcov >= min_pctcov:
             debug("checking " + ins_name + " for match, ins_pctcov is good, setting match to nonempty")
@@ -450,10 +455,10 @@ def print_insertion(ins, ref_seqs):
 
     pctid_str = (str(ins['me_match']['pctid']) + "%").rjust(6)
     # percent of insert covered by alignment
-    ins_pctcov_str = (("%.1f" % ins['me_match']['ins_pctcov']) + "%").rjust(6)
+    rem_ins_pctcov_str = (("%.1f" % ins['me_match']['rem_ins_pctcov']) + "%").rjust(6)
     # percent of reference ME sequence covered by alignment
     me_pctcov_str = (("%.1f" % ins['me_match']['me_pctcov']) + "%").rjust(6)
-    me_str = ins['me_match']['ME'].ljust(5) + "|" + ins['me_match']['strand'].ljust(3) + "|" + me_pctcov_str + "|" + pctid_str + "|" + ins_pctcov_str
+    me_str = ins['me_match']['ME'].ljust(5) + "|" + ins['me_match']['strand'].ljust(3) + "|" + me_pctcov_str + "|" + pctid_str + "|" + rem_ins_pctcov_str
     print(pos_str + "|" + me_str + "| " + seq_before + " [" + ins_str + "] " + seq_after)
 
     # print TSD, polyA position
