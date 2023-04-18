@@ -208,7 +208,7 @@ def read_water(wfile):
             if coords['x2'] is None or coords['x2'] < h:
                 coords['x2'] = h
         
-        # TODO - parse min/max coords from match lines
+        # parse min/max alignment coords from match lines
         me_coords = { 'x1': None, 'x2': None }
         insertion_coords = { 'x1': None, 'x2': None }
         ctr = -1
@@ -294,7 +294,7 @@ def check_insertion_for_tsd(ins, ref_seqs):
     #
     # [] = inserted sequence
 
-    # TODO - note that this situation is possible too, but it depends on the insertion caller
+    # note that the following situation is possible too, but it depends on the insertion caller
     # where the 5' TSD appears wrt to the called insertion. PAV always seems to place the
     # 5' TSD inside the insertion
     #
@@ -323,9 +323,9 @@ def check_insertion_for_tsd(ins, ref_seqs):
         if ref_seq_pos < 0 or ins_seq_pos < 0:
             break
 
-    return {
-        'before': { 'tsd': tsd_before, 'len': len(tsd_before) },
-        'after': { 'tsd': tsd_after, 'len': len(tsd_after) },
+    ins['tsds'] = {
+        'before': { 'tsd': tsd_before, 'len': len(tsd_before), 'x1': ins_seq_len - len(tsd_before), 'x2': ins_seq_len - 1},
+        'after': { 'tsd': tsd_after, 'len': len(tsd_after), 'x1': 1, 'x2': len(tsd_after)},
     }
 
 def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, min_pctcov, strand):
@@ -344,15 +344,49 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
     debug("checking " + ins_name + " for match, al=" + str(al))
     if (al['pct_id'] >= min_pctid) and (pctid_nogaps >= min_pctid_nogaps):
         debug("checking " + ins_name + " for match, pctid is good ")
-        # TODO - pctcov shouldn't include TSD or polyA
-#        available_bp = vcf_ins['len'] - vcf_ins['tsd']['len']
-        available_bp = vcf_ins['len']
-        ins_pctcov = (al['length'] / available_bp) * 100.0
+        ins_len = len(vcf_ins['ins'])
+        me_x1 = al['insertion_coords']['x1']
+        me_x2 = al['insertion_coords']['x2']
+        tsd = vcf_ins['tsds']['after'];
+        polyX = vcf_ins['polyA'] if vcf_ins['polyA']['len'] > vcf_ins['polyT']['len'] else vcf_ins['polyT']
+
+        # coordinates should be base-based, indexed from 1
+        if DEBUG:
+            def pfeat(l, x1, x2, name):
+                fl = x2 - x1 + 1
+                str = "".ljust(x1-1) + name.center(fl, "-") + "".ljust(l - x2 + 1)
+                return str
+        
+            print(vcf_ins['ins'])
+            print(pfeat(ins_len, me_x1, me_x2, al['ME']))
+            if tsd['len'] > 0:
+                print(pfeat(ins_len, tsd['x1'], tsd['x2'], 'TSD'))
+            if polyX['len'] > 0:
+                print(pfeat(ins_len, polyX['x1'], polyX['x2'], 'polyX'))
+            
+        # compute percent of the insertion covered by the ME alignment after removing TSD + polyX
+        # these may overlap 
+        remaining_bp = vcf_ins['len'] - tsd['len'] - polyX['len']
+        # NOTE - if we don't trim the portions of the alignment overlapping with the
+        # polyX/TSD then we may get coverage > 100%. however, trimming is nontrivial
+        # because the trimmed portion may include indels
+        rem_ins_pctcov = (al['length'] / remaining_bp) * 100.0
+
+        # percent of the _entire_ insertion covered by the ME alignment
+        ins_pctcov = (al['length'] / vcf_ins['len']) * 100.0
         me_pctcov =  (al['length'] / ME_LENGTHS[al['ME']]) * 100.0
         debug("checking " + ins_name + " for match, ins_pctcov=" + str(ins_pctcov) + " me_pctcov=" + str(me_pctcov))
-        if ins_pctcov >= min_pctcov:
+        if rem_ins_pctcov >= min_pctcov:
             debug("checking " + ins_name + " for match, ins_pctcov is good, setting match to nonempty")
-            me_match = { 'ME': al['ME'], 'pctid':al['pct_id'], 'ins_pctcov': ins_pctcov, 'me_pctcov': me_pctcov, 'alignment': al, 'strand': strand }
+            me_match = {
+                'ME': al['ME'],
+                'pctid':al['pct_id'],
+                'rem_ins_pctcov': rem_ins_pctcov,
+                'ins_pctcov': ins_pctcov,
+                'me_pctcov': me_pctcov,
+                'alignment': al,
+                'strand': strand
+            }
     return me_match
 
 def check_insertion_for_polyA(vcf_ins):
@@ -367,8 +401,13 @@ def check_insertion_for_polyA(vcf_ins):
             end += offset
             plen += 1
 
-        x1 = start if offset > 0 else end
-        x2 = end if offset > 0 else start
+        if offset > 0:
+            x1 = start + 1
+            x2 = end
+        else:
+            x1 = end + 2
+            x2 = start + 1
+
         return { 'len': plen, 'x1': x1, 'x2': x2 }
     
     # 1. search backwards from end of insertion sequence for polyA
@@ -534,14 +573,20 @@ def main():
     n_me_match = 0
     for vcf_ins in vcf_insertions:
         # check for presence of target site duplication
-        tsds = check_insertion_for_tsd(vcf_ins, fasta_files)
-        vcf_ins['tsds'] = tsds
-        
+        check_insertion_for_tsd(vcf_ins, fasta_files)
+        tsds = vcf_ins['tsds']
+
         if tsds['before']['len'] >= MIN_TSD_LEN and tsds['before']['len'] <= MAX_TSD_LEN:
             n_tsd_before += 1
         if tsds['after']['len'] >= MIN_TSD_LEN and tsds['after']['len'] <= MAX_TSD_LEN:
             n_tsd_after += 1
 
+        # check for polyA/polyT
+        check_insertion_for_polyA(vcf_ins)
+
+        if vcf_ins['polyA']['len'] > 1 and vcf_ins['polyT']['len'] > 1 and vcf_ins['polyA']['len'] == vcf_ins['polyT']['len']:
+            fatal("found polyA and polyT both of length " + str(vcf_ins['polyA']['len']))
+        
         # check for qualifying match with mobile element
         alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
         alu_rev_match = check_insertion_for_ME_match(vcf_ins, alu_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
@@ -567,9 +612,6 @@ def main():
             # don't expect this to happen for PAV-called L1-mediated insertions:
             if tsds['before']['len'] > tsds['after']['len']:
                 fatal("Longer TSD sequence found _before_ the insertion point.")
-
-        # check for polyA/polyT
-        polyA = check_insertion_for_polyA(vcf_ins)
 
         # print insertions with ME match (but maybe no TSD)
         if me_match is not None:
