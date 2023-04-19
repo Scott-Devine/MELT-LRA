@@ -496,7 +496,6 @@ def print_insertion(ins, ref_seqs):
     r_context_bp = 30
     
     # display region around insertion point (i.e., the point after the REF base)
-    # TODO - check for off by 1 errors:
     bp_before = l_context_bp if ref_seq_pos > l_context_bp else ref_seq_pos
     bp_after = r_context_bp if (ref_seq_pos + r_context_bp < ref_seq_len) else ref_seq_len - ref_seq_pos
 

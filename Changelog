@@ -1,4 +1,5 @@
 v1.0.1 (? 2023)
+ -Calculate insertion coverage as <ME_alignment_bp_uncovered_by_tsd_polyX> / <insertion_bp_uncovered_by_tsd_polyX>
  -Look for TSD both before and after insertion, fail if longer TSD found before insertion.
  -Remove restrictions on TSD length.
  -Add --min_pctid_nogaps option to filter MEIs using percent identity computed ignoring gaps.
