@@ -169,7 +169,7 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
                 'vcf_id': vcf_id,
                 'ref': ref,
                 'alt': alt,
-                'len': len(alt),
+                'len': len(alt) - 1,
                 'ins': alt[1:],
                 'qual': qual,
                 'filt': filt,
@@ -328,11 +328,59 @@ def check_insertion_for_tsd(ins, ref_seqs):
         'after': { 'tsd': tsd_after, 'len': len(tsd_after), 'x1': 1, 'x2': len(tsd_after)},
     }
 
+def pfeat(l, x1, x2, name):
+    fl = x2 - x1 + 1
+    str = "".ljust(x1-1) + name.center(fl, "-") + "".ljust(l - x2 + 1)
+    return str
+
+# Take the union of a set of intervals
+def union_intervals(ivs):
+    # sort by start coord
+    sorted_ivs = sorted(ivs, key = lambda x: x['x1'], reverse=False)
+    # join overlapping intervals
+    i = 0
+    while i < len(sorted_ivs) - 1:
+        i1 = sorted_ivs[i]
+        i2 = sorted_ivs[i+1]
+        # overlap, merge and check for overlap with next
+        if i1['x2'] >= i2['x1']:
+            i1['x2'] = i2['x2']
+            sorted_ivs.pop(i+1)
+            # no overlap, consider next pair
+        else:
+            i += 1
+    return sorted_ivs
+
+# Intersect a list of intervals with a single specified interval
+def intersect_intervals(ivs, ii):
+    res_ivs = []
+    for i in ivs:
+        new_x1 = None
+        new_x2 = None
+        # ii starts inside i
+        if i['x1'] <= ii['x1'] <= i['x2']:
+            new_x1 = ii['x1']
+            new_x2 = ii['x2'] if ii['x2'] <= i['x2'] else i['x2']
+        # ii ends inside i
+        elif i['x1'] <= ii['x2'] <= i['x2']:
+            new_x1 = i['x1']
+            new_x2 = ii['x2']
+        if new_x1 is not None:
+            res_ivs.append({'x1': new_x1, 'x2': new_x2})
+        
+    return res_ivs
+
+def sum_interval_lengths(ivs):
+    s = 0
+    for i in ivs:
+        s += i['x2'] - i['x1'] + 1
+    return s
+
 def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, min_pctcov, strand):
-    ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len']-1)
+    ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len'])
     if ins_name not in aligns:
         # ugh
-        ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']) + '-INS-' + str(vcf_ins['len']-1)
+        ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']) + '-INS-' + str(vcf_ins['len'])
         if ins_name not in aligns:
             fatal("no alignment found for " + ins_name)
     al = aligns[ins_name]
@@ -352,30 +400,46 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
 
         # coordinates should be base-based, indexed from 1
         if DEBUG:
-            def pfeat(l, x1, x2, name):
-                fl = x2 - x1 + 1
-                str = "".ljust(x1-1) + name.center(fl, "-") + "".ljust(l - x2 + 1)
-                return str
-        
             print(vcf_ins['ins'])
             print(pfeat(ins_len, me_x1, me_x2, al['ME']))
             if tsd['len'] > 0:
                 print(pfeat(ins_len, tsd['x1'], tsd['x2'], 'TSD'))
             if polyX['len'] > 0:
                 print(pfeat(ins_len, polyX['x1'], polyX['x2'], 'polyX'))
-            
-        # compute percent of the insertion covered by the ME alignment after removing TSD + polyX
-        # these may overlap 
-        remaining_bp = vcf_ins['len'] - tsd['len'] - polyX['len']
 
+        # compute percent of the insertion covered by the ME alignment after removing TSD + polyX
+        #  make list of intervals to remove (e.g., TSD, polyX)
+        def trim_to_range(i, min, max):
+            if i['x1'] < min:
+                i['x1'] = min
+            if i['x2'] > max:
+                i['x2'] = max
+            return i
+                
+        #  trim intervals to insertion coords (e.g., for super-long TSDs)
+        intervals = [trim_to_range({'x1': i['x1'], 'x2': i['x2']}, 0, vcf_ins['len']) for i in [tsd, polyX] if i['len'] > 0]
+        debug("intervals = " + str(intervals))
+        joined_intervals = union_intervals(intervals)
+        joined_intervals_bp = sum_interval_lengths(joined_intervals)
+        remaining_bp = vcf_ins['len'] - joined_intervals_bp
+        debug("joined_intervals_bp = " + str(joined_intervals_bp))
+
+        #  intersect overlapping intervals with alignment
+        intersected_intervals = intersect_intervals(joined_intervals, al['insertion_coords'])
+        intersected_intervals_bp = sum_interval_lengths(intersected_intervals)
+        debug("intersected_intervals = " + str(intersected_intervals))
+        debug("intersected_intervals_bp = " + str(intersected_intervals_bp))
+        
         # alignment length in insertion and ME coords
         al_len = al['insertion_coords']['x2'] - al['insertion_coords']['x1'] + 1
         al_len_me = al['ME_coords']['x2'] - al['ME_coords']['x1'] + 1
+        
+        # bp in the alignment not covered by TSD/polyX
+        remaining_alignment_bp = al_len - intersected_intervals_bp
+        rem_ins_pctcov = (remaining_alignment_bp / remaining_bp) * 100.0 if remaining_bp > 0 else 0
+        debug("remaining_bp = " + str(remaining_bp) + " remaining_alignment_bp = " + str(remaining_alignment_bp))
 
-        # NOTE - if we don't trim the portions of the alignment overlapping with the
-        # polyX/TSD then we may get coverage > 100%. however, trimming is nontrivial
-        # because the trimmed portion may include indels
-        rem_ins_pctcov = (al_len / remaining_bp) * 100.0
+        # TODO - now compute percent identity based solely on the portion of the alignment that was used in the coverage calculation
 
         # percent of the _entire_ insertion covered by the ME alignment
         ins_pctcov = (al_len / vcf_ins['len']) * 100.0
@@ -386,6 +450,7 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
             me_match = {
                 'ME': al['ME'],
                 'pctid':al['pct_id'],
+                'pctid_nogaps':pctid_nogaps,
                 'rem_ins_pctcov': rem_ins_pctcov,
                 'ins_pctcov': ins_pctcov,
                 'me_pctcov': me_pctcov,
@@ -450,15 +515,16 @@ def print_insertion(ins, ref_seqs):
     l_bp = 45
     r_bp = 45
     middle_bp = 14
-    remaining_bp = ins['len'] - 1 - l_bp - r_bp
+    remaining_bp = ins['len'] - l_bp - r_bp
     ins_str = ins['alt'][1:l_bp+1] + "..." + ("+" + str(remaining_bp) + "bp").center(middle_bp-6,".") + "..." + ins['alt'][-r_bp:]
 
     pctid_str = (str(ins['me_match']['pctid']) + "%").rjust(6)
+    pctid_nogaps_str = (('%.1f' % ins['me_match']['pctid_nogaps']) + "%").rjust(6)
     # percent of insert covered by alignment
     rem_ins_pctcov_str = (("%.1f" % ins['me_match']['rem_ins_pctcov']) + "%").rjust(6)
     # percent of reference ME sequence covered by alignment
     me_pctcov_str = (("%.1f" % ins['me_match']['me_pctcov']) + "%").rjust(6)
-    me_str = ins['me_match']['ME'].ljust(5) + "|" + ins['me_match']['strand'].ljust(3) + "|" + me_pctcov_str + "|" + pctid_str + "|" + rem_ins_pctcov_str
+    me_str = ins['me_match']['ME'].ljust(5) + "|" + ins['me_match']['strand'].ljust(3) + "|" + me_pctcov_str + "|" + pctid_str + "|" + pctid_nogaps_str + "|" + rem_ins_pctcov_str
     print(pos_str + "|" + me_str + "| " + seq_before + " [" + ins_str + "] " + seq_after)
 
     # print TSD, polyA position
@@ -489,7 +555,7 @@ def print_insertion(ins, ref_seqs):
     pt = ins['polyT']
     pt_len = pt['len']
     if pt_len >= 7:
-        ins_str_left = ins_str_left[0:pt['x1']] + '<' + "polyT".center(pt_len-2, "-") + '>' + ins_str_left[pt['x2']:]
+        ins_str_left = ins_str_left[0:pt['x1']-1] + '<' + "polyT".center(pt_len-2, "-") + '>' + ins_str_left[pt['x2']:]
         ins_str_left = ins_str_left[0:l_bp]
         
     print(pos_str + " " + me_str + "  " + seq_before + "  " + ins_str_left + ins_str_middle + ins_str_right + "  " + seq_after)
@@ -571,7 +637,7 @@ def main():
     line_rev_aligns = read_water(args.line_water_rev)
     info("read " + str(len(line_rev_aligns)) + " reverse strand LINE1 alignment(s) from " + args.line_water_rev)
 
-    print("Location        |ME   |+/-|%ME   |%id   |%cov  | insertion")
+    print("Location        |ME   |+/-|%ME   |%id   |%id_ng|%cov  | insertion")
 
     n_tsd_before = 0
     n_tsd_after = 0
