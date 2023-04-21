@@ -13,6 +13,7 @@ import sys
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
+VERSION = '1.1.0'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -595,6 +596,9 @@ def check_insertion_for_polyA(vcf_ins, window_size_bp, max_mismatch_bp):
 # ------------------------------------------------------
 # print_insertion()
 # ------------------------------------------------------
+def ins_position_str(ins):
+    return (ins['chrom'] + ":" + str(ins['pos'])).ljust(16)
+
 def print_insertion(ins, ref_seqs):
     ref_seq = ref_seqs[ins['chrom']]
     ref_seq_len = ref_seq['len']
@@ -616,7 +620,7 @@ def print_insertion(ins, ref_seqs):
         fatal("seq_before[-1] (" + seq_before[-1] + ") != REF (" + ins['ref'] + ")")
 
     tsd_str = ins['tsds']['after']['tsd'] if ins['tsds']['after']['tsd'] is not None else '-'
-    pos_str = (ins['chrom'] + ":" + str(ins['pos'])).ljust(16)
+    pos_str = ins_position_str(ins)
     # sequence to display inside the insertion
     l_bp = 45
     r_bp = 45
@@ -712,7 +716,12 @@ def main():
         for seqid in args.skip_seqids.split(','):
             info("skipping insertions on sequence " + seqid)
             skip_seqids[seqid] = True
-    
+
+    # echo arguments
+    info("VERSION " + VERSION)
+    for arg in vars(args):
+        info(arg + "=" + str(getattr(args, arg)))
+            
     # read reference FASTA files
     fasta_files = read_fasta_dir(args.fasta_dir, args.seqid, skip_seqids)
 
@@ -764,7 +773,7 @@ def main():
         check_insertion_for_polyA(vcf_ins, args.polyx_window_bp, args.polyx_max_mismatch_bp)
 
         if vcf_ins['polyA']['score'] > 3 and vcf_ins['polyT']['score'] > 3 and vcf_ins['polyA']['score'] == vcf_ins['polyT']['score']:
-            warn("found polyA and polyT both with score " + str(vcf_ins['polyA']['score']))
+            warn(ins_position_str(vcf_ins) + " polyA and polyT both have score " + str(vcf_ins['polyA']['score']))
         
         # check for qualifying match with mobile element
         alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
@@ -790,7 +799,7 @@ def main():
             n_me_match += 1
             # don't expect this to happen for PAV-called L1-mediated insertions:
             if tsds['before']['len'] > tsds['after']['len']:
-                fatal("Longer TSD sequence found _before_ the insertion point.")
+                warn(ins_position_str(vcf_ins) + " longer TSD sequence found before insertion point")
 
         # print insertions with ME match (but maybe no TSD)
         if me_match is not None:
