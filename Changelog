@@ -1,4 +1,5 @@
 v1.0.1 (? 2023)
+ -Implement sliding window for polyA/polyT detection, add --polyx_window_bp, --polyx_max_mismatch_bp options. (#1)
  -Calculate insertion coverage as <ME_alignment_bp_uncovered_by_tsd_polyX> / <insertion_bp_uncovered_by_tsd_polyX> (#9)
  -Look for TSD both before and after insertion, fail if longer TSD found before insertion.
  -Remove restrictions on TSD length.

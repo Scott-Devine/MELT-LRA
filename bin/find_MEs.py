@@ -333,6 +333,13 @@ def pfeat(l, x1, x2, name):
     str = "".ljust(x1-1) + name.center(fl, "-") + "".ljust(l - x2 + 1)
     return str
 
+def pfeat2(l, f, name):
+    x1 = f['x1']
+    x2 = f['x2']
+    fl = x2 - x1 + 1
+    str = "".ljust(x1-1) + "".center(fl, "-") + "".ljust(l - x2 + 1) + "  <- " + name
+    return str
+
 # Take the union of a set of intervals
 def union_intervals(ivs):
     # sort by start coord
@@ -396,8 +403,14 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
         me_x1 = al['insertion_coords']['x1']
         me_x2 = al['insertion_coords']['x2']
         tsd = vcf_ins['tsds']['after'];
-        polyX = vcf_ins['polyA'] if vcf_ins['polyA']['len'] > vcf_ins['polyT']['len'] else vcf_ins['polyT']
 
+        # use orientation of match to break ties
+        polyX = vcf_ins['polyA']
+        if vcf_ins['polyT']['score'] > polyX['score']:
+            polyX = vcf_ins['polyT']
+        elif vcf_ins['polyT']['score'] == polyX['score']:
+            polyX = vcf_ins['polyA'] if strand == '+' else vcf_ins['polyT']
+            
         # coordinates should be base-based, indexed from 1
         if DEBUG:
             print(vcf_ins['ins'])
@@ -458,33 +471,127 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
                 'strand': strand
             }
     return me_match
-
-def check_insertion_for_polyA(vcf_ins):
-    ins = vcf_ins['ins']
     
-    # TODO - don't require exact match
-    def find_polyX(base, start, offset):
-        end = start
-        plen = 0
+# find polyA/polyT using exact match
+#
+#  seq - sequence to search for polyA/polyT
+#  base - either 'A' or 'T'
+#  start - starting position betwee 0 and len(seq) - 1
+#  offset - 1 to search forwards from start, -1 to search backwards from start
+#
+def find_polyX_exact(seq, base, start, offset):
+    uc_base = base.upper()
+    end = start
+    plen = 0
         
-        while (end >= 0) and (end < len(ins)) and ins[end] == base:
-            end += offset
-            plen += 1
+    while (end >= 0) and (end < len(seq)) and seq[end].upper() == uc_base:
+        end += offset
+        plen += 1
+        
+    if offset > 0:
+        x1 = start + 1
+        x2 = end
+    else:
+        x1 = end + 2
+        x2 = start + 1
 
-        if offset > 0:
-            x1 = start + 1
-            x2 = end
+    return { 'len': plen, 'x1': x1, 'x2': x2 }
+
+# find polyA/polyT using sliding window
+#
+#  seq - sequence to search for polyA/polyT
+#  base - either 'A' or 'T'
+#  start - starting position betwee 0 and len(seq) - 1
+#  offset - 1 to search forwards from start, -1 to search backwards from start
+#  wlen - window length >= 1
+#  max_mismatches - max number of bp mismatch in any window of length wlen
+#
+def find_polyX_sliding_window(seq, base, start, offset, wlen, max_mismatches):
+    uc_base = base.upper()
+    orig_start = start
+    end = start
+    base_count = 0
+    nonbase_count = 0
+    polyX_seq = ''
+
+    def add_or_remove_base(pos, add, offset):
+        nonlocal base_count
+        nonlocal nonbase_count
+        nonlocal polyX_seq
+        
+        if seq[pos].upper() == uc_base:
+            base_count += add
         else:
-            x1 = end + 2
-            x2 = start + 1
+            nonbase_count += add
 
-        return { 'len': plen, 'x1': x1, 'x2': x2 }
+        if add == 1:
+            if offset > 0:
+                polyX_seq = polyX_seq + seq[pos]
+            else:
+                polyX_seq = seq[pos] + polyX_seq
+
+    # end is out of range
+    if end >= len(seq):
+        if offset == -1:
+            return {'len': 0, 'x1': end+2, 'x2': end+1, 'score': 0}
+        else:
+            return {'len': 0, 'x1': end+1, 'x2': end, 'score': 0}
     
-    # 1. search backwards from end of insertion sequence for polyA
-    vcf_ins['polyA'] = find_polyX('A', len(ins) - 1, -1)
-    # 2. search forwards from start of insertion sequence for polyT
-    vcf_ins['polyT'] = find_polyX('T', vcf_ins['tsds']['after']['len'], 1)
+    # start with window of size 1
+    wsize = 1
+    add_or_remove_base(end, 1, offset)
+        
+    while ((offset == 1) or (end > 0)) and ((offset == -1) or (end < len(seq) - 1)) and (nonbase_count <= max_mismatches):
+        # add a base to the end of the window
+        end += offset
+        wsize += 1
+        add_or_remove_base(end, 1, offset)
+            
+        # remove a base from the start of the window
+        if wsize > wlen:
+            add_or_remove_base(start, -1, offset)
+            start += offset
+            wsize -= 1
 
+    # trim nonbase characters, but only from the end (start is given and assumed to be correct?)
+    nb_re = '[^' + base + ']+'
+    rep = nb_re + '$' if offset > 0 else '^' + nb_re
+    new_polyX_seq = re.sub(rep, '', polyX_seq, re.IGNORECASE)
+    bp_trimmed = len(polyX_seq) - len(new_polyX_seq)
+    
+    if offset > 0:
+        x1 = orig_start + 1
+        x2 = end + 1 - bp_trimmed
+    else:
+        x1 = end + 1 + bp_trimmed
+        x2 = orig_start + 1
+
+    only_matches_seq = re.sub(nb_re, '', new_polyX_seq, re.IGNORECASE)
+        
+    return { 'len': x2 - x1 + 1, 'x1': x1, 'x2': x2, 'score': len(only_matches_seq) }
+
+def check_insertion_for_polyA(vcf_ins, window_size_bp, max_mismatch_bp):
+    ins = vcf_ins['ins']
+    # 1. search backwards from end of insertion sequence for polyA
+#    vcf_ins['polyA'] = find_polyX_exact(ins, 'A', len(ins) - 1, -1)
+    vcf_ins['polyA'] = find_polyX_sliding_window(ins, 'A', len(ins) - 1, -1, window_size_bp, max_mismatch_bp)
+        
+    # 2. search forwards from start of insertion sequence for polyT
+#    vcf_ins['polyT'] = find_polyX_exact(ins, 'T', vcf_ins['tsds']['after']['len'], 1)
+    vcf_ins['polyT'] = find_polyX_sliding_window(ins, 'T', vcf_ins['tsds']['after']['len'], 1, window_size_bp, max_mismatch_bp)
+
+#    print(ins)
+#    print(pfeat2(len(ins), vcf_ins['polyA'], 'polyA'))
+#    print(pfeat2(len(ins), vcf_ins['polyT'], 'polyT'))
+    
+    # sanity check - exact match against polyX_sliding_window
+#    pa_e = find_polyX_sliding_window(ins, 'A', len(ins) - 1, -1, 1, 0)
+#    pt_e = find_polyX_sliding_window(ins, 'T', vcf_ins['tsds']['after']['len'], 1, 1, 0)
+#    if pa_e['x1'] != vcf_ins['polyA']['x1'] or pa_e['x2'] != vcf_ins['polyA']['x2']:
+#        fatal("polyA mismatch: " + str(vcf_ins['polyA']) + " - " + str(pa_e))
+#    if pt_e['x1'] != vcf_ins['polyT']['x1'] or pt_e['x2'] != vcf_ins['polyT']['x2']:
+#        fatal("polyT mismatch: " + str(vcf_ins['polyT']) + " - " + str(pt_e))
+    
 # ------------------------------------------------------
 # print_insertion()
 # ------------------------------------------------------
@@ -594,6 +701,8 @@ def main():
     parser.add_argument('--min_pctid', required=False, type=int, default=90, help='Minimum percent identity of alignment.')
     parser.add_argument('--min_pctid_nogaps', required=False, type=int, default=90, help='Minimum percent identity of alignment ignoring gaps.')
     parser.add_argument('--min_pctcov', required=False, type=int, default=85, help='Minimum percent coverage of alignment.')
+    parser.add_argument('--polyx_window_bp', required=False, type=int, default=4, help='Sliding window size for polyA/polyT detection.')
+    parser.add_argument('--polyx_max_mismatch_bp', required=False, type=int, default=1, help='Maximum number of mismatches in sliding window for polyA/polyT detection.')
     parser.add_argument('--seqid', required=False, help='Optional sequence id: process only insertions on this reference sequence.')
     parser.add_argument('--skip_seqids', required=False, help='Optional comma-delimited list of sequence ids to skip.')
     args = parser.parse_args()
@@ -652,10 +761,10 @@ def main():
             n_tsd_after += 1
 
         # check for polyA/polyT
-        check_insertion_for_polyA(vcf_ins)
+        check_insertion_for_polyA(vcf_ins, args.polyx_window_bp, args.polyx_max_mismatch_bp)
 
-        if vcf_ins['polyA']['len'] > 1 and vcf_ins['polyT']['len'] > 1 and vcf_ins['polyA']['len'] == vcf_ins['polyT']['len']:
-            fatal("found polyA and polyT both of length " + str(vcf_ins['polyA']['len']))
+        if vcf_ins['polyA']['score'] > 3 and vcf_ins['polyT']['score'] > 3 and vcf_ins['polyA']['score'] == vcf_ins['polyT']['score']:
+            warn("found polyA and polyT both with score " + str(vcf_ins['polyA']['score']))
         
         # check for qualifying match with mobile element
         alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
