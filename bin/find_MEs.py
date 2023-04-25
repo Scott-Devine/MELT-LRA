@@ -34,7 +34,8 @@ ME_LENGTHS = {
 }
 
 # CSV output
-CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'TSD_seq', 'polyA_coords', 'polyT_coords', 'match_string']
+CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyA_coords', 'polyT_coords', 'match_string']
+CSV_FLANKING_SEQ_BP = 30
 
 # ------------------------------------------------------
 # logging
@@ -650,15 +651,27 @@ def print_insertion(ins, ref_seqs, csv_fh):
     ref_seq_pos = ins['pos']
     l_context_bp = 10
     r_context_bp = 30
+
+    def get_l_context_bp(cbp):
+        bp_before = cbp if ref_seq_pos > cbp else ref_seq_pos
+        sb_from = ref_seq_pos - bp_before
+        return ref_seq['seq'][sb_from:ref_seq_pos]
+
+    def get_r_context_bp(cbp):
+        bp_after = cbp if (ref_seq_pos + cbp < ref_seq_len) else ref_seq_len - ref_seq_pos
+        sa_to = ref_seq_pos + bp_after
+        return ref_seq['seq'][ref_seq_pos:sa_to]
+
+    seq_before = get_l_context_bp(l_context_bp)
+    seq_after = get_r_context_bp(r_context_bp)
     
     # display region around insertion point (i.e., the point after the REF base)
-    bp_before = l_context_bp if ref_seq_pos > l_context_bp else ref_seq_pos
-    bp_after = r_context_bp if (ref_seq_pos + r_context_bp < ref_seq_len) else ref_seq_len - ref_seq_pos
-
-    sb_from = ref_seq_pos - bp_before
-    seq_before = ref_seq['seq'][sb_from:ref_seq_pos]
-    sa_to = ref_seq_pos + bp_after
-    seq_after = ref_seq['seq'][ref_seq_pos:sa_to]
+#    bp_before = l_context_bp if ref_seq_pos > l_context_bp else ref_seq_pos
+#    bp_after = r_context_bp if (ref_seq_pos + r_context_bp < ref_seq_len) else ref_seq_len - ref_seq_pos
+#    sb_from = ref_seq_pos - bp_before
+#    seq_before = ref_seq['seq'][sb_from:ref_seq_pos]
+#    sa_to = ref_seq_pos + bp_after
+#    seq_after = ref_seq['seq'][ref_seq_pos:sa_to]
 
     # last base of seq_before should be REF
     if seq_before[-1].upper() != ins['ref']:
@@ -736,7 +749,9 @@ def print_insertion(ins, ref_seqs, csv_fh):
     
     # CSV output
     if csv_fh is not None:
-        # ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment']
+        # ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment']
+        l_flank = get_l_context_bp(CSV_FLANKING_SEQ_BP)
+        r_flank = get_r_context_bp(CSV_FLANKING_SEQ_BP)
         csv_data = [ins['chrom'],
                     str(ins['pos']),
                     ins['me_match']['strand'],
@@ -746,6 +761,8 @@ def print_insertion(ins, ref_seqs, csv_fh):
                     pctid_nogaps_str.strip(),
                     rem_ins_pctcov_str.strip(),
                     ins['alt'][1:],
+                    l_flank,
+                    r_flank,
                     ins['tsds']['after']['tsd'],
                     coords2str(ins['polyX']),
                     coords2str(ins['me_match']['alignment']['ME_coords']),
