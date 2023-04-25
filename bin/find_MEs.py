@@ -13,7 +13,7 @@ import sys
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -32,6 +32,9 @@ ME_LENGTHS = {
     'SVA_F': 1375,
     'LINE1': 6019
 }
+
+# CSV output
+CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'TSD_seq', 'polyA_coords', 'polyT_coords', 'match_string']
 
 # ------------------------------------------------------
 # logging
@@ -214,6 +217,46 @@ def read_water(wfile):
         insertion_coords = { 'x1': None, 'x2': None }
         ctr = -1
 
+        # create cigar/match string, using "^" for gap in ref seq, "v" for gap in insertion seq:
+        #
+        # input:
+        #   ALU               55 --GGCGGATCACGAGGTCAGG---AGATCGAGACCATCCTGGCTAACACG     99
+        #                          ||||           ||||   |||  |||.|...||..||     ||
+        #   chr1-10829-IN     55 CCGGCG-----------CAGGCGCAGA--GAGGCGCGCCGCGC-----CG     86
+        #
+        # output:
+        #   ^^||||vvvvvvvvvvv||||^^^|||vv|||.|...||..||vvvvv||
+        # 
+        al['match_str'] = ""
+        match_chars = None
+        seq_x1 = None
+        seq_x2 = None
+        
+        def update_match_str(ct, ml):
+            nonlocal match_chars
+            nonlocal seq_x1
+            nonlocal seq_x2
+            
+            if ct == 1 or ct == 3:
+                m = re.match(r'^(\S+\s+\d+ )(\S+)(\s+\d+)\s*$', ml)
+                if not m:
+                    fatal("unable to parse match line 1 - " + ml)
+                if ct == 1:
+                    match_chars = list(re.sub(r'-', '^', m.group(2)))
+                    seq_x1 = len(m.group(1))
+                    seq_x2 = seq_x1 + len(match_chars)
+                else:
+                    seq = m.group(2)
+                    for i in range(0, len(seq)):
+                        if seq[i] == '-':
+                            match_chars[i] = "v"
+                    al['match_str'] = al['match_str'] + "".join(match_chars)
+            elif ct == 2:
+                matches = ml[seq_x1:seq_x2]
+                for i in range(0, len(matches)):
+                    if matches[i] != ' ':
+                        match_chars[i] = matches[i]
+        
         for ml in al['match_lines']:
             ctr = (ctr + 1) % 4
             if ctr == 1:
@@ -222,11 +265,12 @@ def read_water(wfile):
                 update_coords(me_coords, ml)
             elif ctr == 3:
                 update_coords(insertion_coords, ml)
+            update_match_str(ctr, ml)
         
         al['ME_coords'] = me_coords
         al['insertion_coords'] = insertion_coords
         # save memory
-        al['match_lines'] = None
+#        al['match_lines'] = None
         
     # reading detailed alignment match lines
     reading_match_lines = False
@@ -411,6 +455,7 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
             polyX = vcf_ins['polyT']
         elif vcf_ins['polyT']['score'] == polyX['score']:
             polyX = vcf_ins['polyA'] if strand == '+' else vcf_ins['polyT']
+        vcf_ins['polyX'] = polyX
             
         # coordinates should be base-based, indexed from 1
         if DEBUG:
@@ -599,7 +644,7 @@ def check_insertion_for_polyA(vcf_ins, window_size_bp, max_mismatch_bp):
 def ins_position_str(ins):
     return (ins['chrom'] + ":" + str(ins['pos'])).ljust(16)
 
-def print_insertion(ins, ref_seqs):
+def print_insertion(ins, ref_seqs, csv_fh):
     ref_seq = ref_seqs[ins['chrom']]
     ref_seq_len = ref_seq['len']
     ref_seq_pos = ins['pos']
@@ -685,6 +730,29 @@ def print_insertion(ins, ref_seqs):
     if ins['tsds']['before']['tsd'] != "":
         print("TSD before=" + ins['tsds']['before']['tsd'])
     print()
+
+    def coords2str(c):
+        return str(c['x1']) + '-' + str(c['x2'])
+    
+    # CSV output
+    if csv_fh is not None:
+        # ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment']
+        csv_data = [ins['chrom'],
+                    str(ins['pos']),
+                    ins['me_match']['strand'],
+                    ins['me_match']['ME'],
+                    me_pctcov_str.strip(),
+                    pctid_str.strip(),
+                    pctid_nogaps_str.strip(),
+                    rem_ins_pctcov_str.strip(),
+                    ins['alt'][1:],
+                    ins['tsds']['after']['tsd'],
+                    coords2str(ins['polyX']),
+                    coords2str(ins['me_match']['alignment']['ME_coords']),
+                    coords2str(ins['me_match']['alignment']['insertion_coords']),
+                    ins['me_match']['alignment']['match_str']
+                    ]
+        csv_fh.write(",".join(csv_data) + "\n")
     
 # ------------------------------------------------------
 # main()
@@ -709,6 +777,7 @@ def main():
     parser.add_argument('--polyx_max_mismatch_bp', required=False, type=int, default=1, help='Maximum number of mismatches in sliding window for polyA/polyT detection.')
     parser.add_argument('--seqid', required=False, help='Optional sequence id: process only insertions on this reference sequence.')
     parser.add_argument('--skip_seqids', required=False, help='Optional comma-delimited list of sequence ids to skip.')
+    parser.add_argument('--csv_output', required=False, help='Optional path to CSV format output file.')
     args = parser.parse_args()
 
     skip_seqids = {}
@@ -754,6 +823,14 @@ def main():
     line_rev_aligns = read_water(args.line_water_rev)
     info("read " + str(len(line_rev_aligns)) + " reverse strand LINE1 alignment(s) from " + args.line_water_rev)
 
+    # CSV output
+    csv_fh = None
+    if args.csv_output is not None:
+        csv_fh = open(args.csv_output, "w")
+        if csv_fh is None:
+            fatal("failed to write CSV output to " + args.csv_output)
+        csv_fh.write(",".join(CSV_HEADERS) + "\n")
+            
     print("Location        |ME   |+/-|%ME   |%id   |%id_ng|%cov  | insertion")
 
     n_tsd_before = 0
@@ -803,8 +880,11 @@ def main():
 
         # print insertions with ME match (but maybe no TSD)
         if me_match is not None:
-            print_insertion(vcf_ins, fasta_files)
-        
+            print_insertion(vcf_ins, fasta_files, csv_fh)
+
+    if csv_fh is not None:
+        csv_fh.close()
+            
     # summary
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
     info("found " + str(n_tsd_before) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _before_ the insertion point")
