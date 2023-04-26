@@ -1,0 +1,13 @@
+
+# initial setup with Vite
+npm init vue@latest
+npm install
+npm run dev
+
+# D3
+npm install d3 --save
+
+# Vuetify 3
+npm install 'vuetify@^3.1.14' --save
+perform Manual steps from https://vuetifyjs.com/en/getting-started/installation/
+
