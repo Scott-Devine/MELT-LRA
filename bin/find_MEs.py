@@ -34,7 +34,7 @@ ME_LENGTHS = {
 }
 
 # CSV output
-CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyA_coords', 'polyT_coords', 'match_string']
+CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string']
 CSV_FLANKING_SEQ_BP = 30
 
 # ------------------------------------------------------
