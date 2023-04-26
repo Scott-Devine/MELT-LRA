@@ -1,6 +1,7 @@
 <script setup>
 
   import { reactive } from 'vue'
+  import { format } from 'd3-format'
   import { scaleLinear, scaleLog } from 'd3-scale';
   import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis';
   
@@ -27,10 +28,10 @@
     mei['pos'] = mei['pos'] * 1.0
     return mei;
   }
-
+//  const mei_str = "chr22,16414896,+,LINE1,3.3%,34.2%,90.4%,97.1%,ATTTAGAGACTTGTCCAAGATGTATATTAGTTCCTTGACTCTCTGTCCTAACGTAGTCCAGAGACCTGAGCTGTCTGGACATTCTGTAGCATGTTACATTTGTCCATTTT,TTCACATTCATGGGAAGGACAACAGCATGC,ATTTACCAGTTAAAATAGACTGGGTAAGAA,ATTTA,111-110,678-876,5-107,|.||||^||.|vvvv||||^^^^^^^^|.|.|||.||||||^|||vvvvvvvvvvv.||||||vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv|||.|||v|.||||vvvvvv|||||vvvv||||||vvvvvvvvvvvvvvvvvvvvvvvvvvv||||||vvvvvvvvvvvvvvvv||||||^|||^^^^||^^^^^||||"
   const mei_str = "chr22,11860400,+,ALU,100.0%,97.5%,97.9%,100.0%,AAAATGAATGTATACGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACGAGGTCAGGAGATCGAAACCATCCCGGCTAAAACGGTGAAACCCCGTCTCTACTAAAAATACAAAAAAATTAGCCGGGCGTAGTGGCGGGCGCCTGTAGTCCCAGCTACTTGGGAGGCTGAGGCAGGAGAATGGCGTGAACCCGGGAGGCGGAGCTTGCAGTGAGCCGAGATCCCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAAAAAAAAAAA,TTCCCAGTTACATGGGATCTATAGTTCTAC,AAAATGAATGTATACATAATCCATGTAAAT,AAAATGAATGTATAC,298-312,1-281,16-297,||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||.|||||||.||||||.||||||||||||||||||||||||||||||^||||||||||||||||||.||||||||||||||||||||||||||||.||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||.||||||||||||||||||||||||||||||||||||||||||||"
   const mei = parse_mei(mei_str)
-
+  
   // SVG coordinate system
   const width = 1200
   const height = 250
@@ -51,8 +52,8 @@
   const ins_rx2 = max_xscale(ins_x + ins_len)
   const ins_xscale = scaleLinear().domain([0, ins_len]).range([ins_rx1, ins_rx2]);
   const ins_xaxis = axisTop(ins_xscale)
-  const[px_x1, px_x2] = mei.polyX_coords.split("-")
-  const[ins_x1, ins_x2] = mei.insertion_coords.split("-")
+  const[px_x1, px_x2] = mei.polyX_coords.split("-").map(x => x * 1.0)
+  const[ins_x1, ins_x2] = mei.insertion_coords.split("-").map(x => x * 1.0)
 
   // reference ME coordinate system
   const me_x = (max_len - me_len)/2
@@ -60,14 +61,52 @@
   const me_rx2 = max_xscale(me_x + me_len)
   const me_xscale = scaleLinear().domain([0, me_len]).range([me_rx1, me_rx2]);
   const me_xaxis = axisBottom(me_xscale)
-  const[me_x1, me_x2] = mei.ME_coords.split("-")
+  const[me_x1, me_x2] = mei.ME_coords.split("-").map(x => x * 1.0)
 
-  // alignment spans
-  // DEBUG
-  const spans = [
-    {'ins': [20,200], 'me': [0,180] },
-    {'ins': [220,290], 'me': [200, 270]}
-  ]
+  // convert match string to alignment spans
+  let spans = [];
+  // offsets from left side of the alignment - will add ins_x1, me_x1 to these
+  let ins_o1 = 0
+  let ins_o2 = 0
+  let me_o1 = 0
+  let me_o2 = 0
+  let n_id_bp = 0
+  const msl = mei.match_string.length;
+
+  function add_span() {
+    if (((ins_o2 - ins_o1) > 0) && ((me_o2 - me_o1) > 0)) {
+      // TODO - handle reverse strand matches
+      const span = {
+        'ins': [ins_x1 + ins_o1 - 1, ins_x1 + ins_o2 - 1], 
+        'me': [me_x1 + me_o1 - 1, me_x1 + me_o2 - 1],
+        'pct_id': (n_id_bp / (ins_o2 - ins_o1)) * 100.0
+      }
+      spans.push(span)
+      console.log("adding " + span.ins[0] + ' - ' + span.ins[1] + " / " + span.me[0] + ' - ' + span.me[1] + " " + span.pct_id)
+      n_id_bp = 0
+    }
+  }
+
+  // match string contains only ^ (gap in insertion), v (gap in ME), |, and .ß
+  for(let i = 0;i < msl; ++i) {
+    if (mei.match_string[i] == '^') {
+      add_span()
+      ins_o2 += 1
+      ins_o1 = ins_o2
+      me_o1 = me_o2
+    } else if (mei.match_string[i] == 'v') {
+      add_span()
+      me_o2 += 1
+      ins_o1 = ins_o2
+      me_o1 = me_o2
+    } else {
+      if (mei.match_string[i] == '|') n_id_bp += 1
+      // start or extend span
+      ins_o2 += 1
+      me_o2 += 1
+    }
+  }
+  add_span()
 
   // convert spans to polygons
   spans.forEach(s => {
@@ -77,7 +116,6 @@
     s.points.push([me_xscale(s.me[1]), 180])
     s.points.push([me_xscale(s.me[0]), 180])
     s.points_str = s.points.join(" ")
-    console.log("points str = " + s.points_str)
   })
 
   const state = reactive({
@@ -127,7 +165,7 @@
       <text v-if="state.tsd_len > 0" :x="state.ins_xscale(0)" :y="70" fill="#ffffff">TSD</text>
       <line :x1="state.ins_xscale(state.polyx_x1)" :x2="state.ins_xscale(state.polyx_x2)" :y1="50" :y2="50" stroke-width="4" stroke="#a0ffff"/>
       <text :x="state.ins_xscale(state.polyx_x1)" :y="70" fill="#ffffff">polyX</text>
-      <!-- <line :x1="state.ins_xscale(state.ins_x1)" :x2="state.ins_xscale(state.ins_x2)" :y1="100" :y2="100" stroke-width="4" stroke="#ffa0a0"/> -->
+      <!-- <line :x1="state.ins_xscale(state.ins_x1)" :x2="state.ins_xscale(state.ins_x2)" :y1="100" :y2="10" stroke-width="4" stroke="#ffa0a0"/> -->
 
       <!-- reference ME -->
       <g v-axis="state.me_xaxis" class="xaxis" :transform="`translate(0,${state.height - 60})`">
@@ -135,6 +173,7 @@
 
       <!-- matching spans -->
       <polygon v-for="s in state.spans" :points="s.points_str" fill="rgba(255,0,0,0.1)" stroke="#ff0000" />
+      <text v-for="s in state.spans" :x="state.me_xscale((s.me[0] + s.me[1]) / 2) + 3" :y="160" fill="#ffffff" text-anchor="middle">{{ format('.0f')(s.pct_id) }}%</text>
       </svg>
   </div>
 </template>
