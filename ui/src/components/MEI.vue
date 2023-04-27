@@ -5,9 +5,10 @@
   import { scaleLinear, scaleLog } from 'd3-scale';
   import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis';
   
- // defineProps({
- // })
-
+  const props = defineProps({
+    meiStr: { type: String, required: true }
+  })
+console.log("props=" + props)
   const ME_LENGTHS = {
     'ALU': 281,
     'SVA': 1316,
@@ -29,8 +30,8 @@
     return mei;
   }
 //  const mei_str = "chr22,16414896,+,LINE1,3.3%,34.2%,90.4%,97.1%,ATTTAGAGACTTGTCCAAGATGTATATTAGTTCCTTGACTCTCTGTCCTAACGTAGTCCAGAGACCTGAGCTGTCTGGACATTCTGTAGCATGTTACATTTGTCCATTTT,TTCACATTCATGGGAAGGACAACAGCATGC,ATTTACCAGTTAAAATAGACTGGGTAAGAA,ATTTA,111-110,678-876,5-107,|.||||^||.|vvvv||||^^^^^^^^|.|.|||.||||||^|||vvvvvvvvvvv.||||||vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv|||.|||v|.||||vvvvvv|||||vvvv||||||vvvvvvvvvvvvvvvvvvvvvvvvvvv||||||vvvvvvvvvvvvvvvv||||||^|||^^^^||^^^^^||||"
-  const mei_str = "chr22,11860400,+,ALU,100.0%,97.5%,97.9%,100.0%,AAAATGAATGTATACGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACGAGGTCAGGAGATCGAAACCATCCCGGCTAAAACGGTGAAACCCCGTCTCTACTAAAAATACAAAAAAATTAGCCGGGCGTAGTGGCGGGCGCCTGTAGTCCCAGCTACTTGGGAGGCTGAGGCAGGAGAATGGCGTGAACCCGGGAGGCGGAGCTTGCAGTGAGCCGAGATCCCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAAAAAAAAAAA,TTCCCAGTTACATGGGATCTATAGTTCTAC,AAAATGAATGTATACATAATCCATGTAAAT,AAAATGAATGTATAC,298-312,1-281,16-297,||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||.|||||||.||||||.||||||||||||||||||||||||||||||^||||||||||||||||||.||||||||||||||||||||||||||||.||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||.||||||||||||||||||||||||||||||||||||||||||||"
-  const mei = parse_mei(mei_str)
+//  const mei_str = "chr22,11860400,+,ALU,100.0%,97.5%,97.9%,100.0%,AAAATGAATGTATACGGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACGAGGTCAGGAGATCGAAACCATCCCGGCTAAAACGGTGAAACCCCGTCTCTACTAAAAATACAAAAAAATTAGCCGGGCGTAGTGGCGGGCGCCTGTAGTCCCAGCTACTTGGGAGGCTGAGGCAGGAGAATGGCGTGAACCCGGGAGGCGGAGCTTGCAGTGAGCCGAGATCCCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAAAAAAAAAAAA,TTCCCAGTTACATGGGATCTATAGTTCTAC,AAAATGAATGTATACATAATCCATGTAAAT,AAAATGAATGTATAC,298-312,1-281,16-297,||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||.|||||||.||||||.||||||||||||||||||||||||||||||^||||||||||||||||||.||||||||||||||||||||||||||||.||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||.||||||||||||||||||||||||||||||||||||||||||||"
+  const mei = parse_mei(props.meiStr)
   
   // SVG coordinate system
   const width = 1200
@@ -39,10 +40,14 @@
   let rx1 = margins.left
   let rx2 = width - margins.right
  
+  const left_flank_bp = mei.left_flank_seq.length
+  const right_flank_bp = mei.right_flank_seq.length
+  const flank_bp = left_flank_bp + right_flank_bp
+
   const ins_len = mei.insertion_seq.length
   const me_len = ME_LENGTHS[mei.ME]
   // center the two sequences horizontally
-  const max_len = ins_len > me_len ? ins_len : me_len;
+  const max_len = (ins_len > me_len ? ins_len : me_len) + flank_bp;
   const max_xscale = scaleLinear().domain([0, max_len]).range([rx1, rx2])
   console.log("ins_len=" + ins_len +  " me_len=" + me_len)
 
@@ -178,18 +183,9 @@
   </div>
 </template>
 
-<script>
-  export default {
-    data() {
-      return {
-      };
-    }
-  }
-</script>
-
 <style scoped>
 .xaxis {
-  font-size: 24px;
+  font-size: 18px;
 }
 
 h1 {

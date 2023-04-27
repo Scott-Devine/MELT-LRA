@@ -1,10 +1,10 @@
 <script setup>
-  import MEI from './components/MEI.vue'
+  import MEI_List from './components/MEI_List.vue'
 </script>
 
 <template>
   <main>
-    <MEI />
+    <MEI_List />
   </main>
 </template>
 
