@@ -39,7 +39,6 @@
     const state = reactive({
         meis: meis
     });
-    console.log("state.meis[0]=" + state.meis[0])
 </script>
 
 <template>
