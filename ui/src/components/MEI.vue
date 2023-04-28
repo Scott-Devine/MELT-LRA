@@ -146,9 +146,15 @@
   }
   add_span()
 
+  const feat_y_offset = 6
+  const lbl_y_offset = 22
+  const ins_axis_y = margins.top + 50
+  const me_axis_y = height - margins.bottom - 50
+
   // convert spans to polygons
-  const match_y1 = 94
-  const match_y2 = 178
+  const match_y1 = ins_axis_y + feat_y_offset
+  const match_y2 = me_axis_y - feat_y_offset
+
   spans.forEach(s => {
     s.points = []
     s.points.push([ins_xscale(s.ins[0]), match_y1])
@@ -187,15 +193,30 @@
     me_x1: me_x1,
     me_x2: me_x2,
     me_cov_str: mei['%ME'] + " coverage",
-    // alignment
+    // y offsets
+    // insertion feature on ref genome axis (top)
+    ins_label_y: margins.top - 10,
+    ins_y: margins.top + 3,
+    // axes for left and right genomic flanking regions (top)
+    flank_axis_y: margins.top,
+    flank_feat_y: margins.top + feat_y_offset,
+    flank_feat_lbl_y: margins.top + lbl_y_offset,
+    // insertion axis and features (below genomic axis)
+    ins_axis_y: ins_axis_y,
+    ins_feat_y: ins_axis_y + feat_y_offset,
+    ins_feat_lbl_y: ins_axis_y + lbl_y_offset,
+    // mobile element reference 
+    me_axis_y: me_axis_y,
+    me_lbl_y: me_axis_y + 50,
+    // alignment spans
     spans: spans
   })
   
 </script>
 
 <template>
-  <div class="greetings">
-    <h1 class="green">[{{state.mei.ME}}] {{ state.mei.chrom }}:{{ state.mei.pos }}:{{ state.mei.strand }}:{{state.ins_len}} bp</h1>
+  <div class="greetings pb-4">
+    <h3 class="green">[{{state.mei.ME}}] {{ state.mei.chrom }}:{{ state.mei.pos }}:{{ state.mei.strand }}:{{state.ins_len}} bp</h3>
 
     <svg
       ref="mei_svg"
@@ -206,36 +227,35 @@
       style="border: 1px solid white"
       >
 
-      <!-- insertion -->
-      <g v-axis="state.ins_xaxis" class="xaxis" :transform="`translate(0,${state.margins.top + 40})`">
-      </g>
-      <line :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.ins_len)" :y1="state.margins.top + 3" :y2="state.margins.top + 3" stroke-width="3" stroke="#ffffff" />
-      <text class="ins_label" :x="state.ins_xscale(state.ins_len/2)" :y="state.margins.top-10" fill="#ffffff">{{ state.ins_len + " bp insertion" }}</text>
-<!--      <rect :x="state.ins_xscale(0)" :y="state.margins.top" :width="state.ins_xscale(state.ins_len) - state.ins_xscale(0)" :height="30" fill="none" stroke="#ffffff" stroke-dasharray="4,4"/> -->
-
+      <!-- insertion feature on ref genome -->
+      <line :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.ins_len)" :y1="state.ins_y" :y2="state.ins_y" stroke-width="3" stroke="#ffffff" />
+      <text class="ins_label" :x="state.ins_xscale(state.ins_len/2)" :y="state.ins_label_y" fill="#ffffff">{{ state.ins_len + " bp insertion [" + state.mei.strand + " strand]" }}</text>
       <!-- genomic sequence flanking regions -->
-      <g v-axis="state.lflank_xaxis" class="xaxis" :transform="`translate(0,${state.margins.top})`">
-      </g>
-      <g v-axis="state.rflank_xaxis" class="xaxis" :transform="`translate(0,${state.margins.top})`">
-      </g>
-      <!-- TSD in right flanking sequence-->
-      <line v-if="state.tsd_len > 0" :x1="state.rflank_xscale(state.rflank_x)" :x2="state.rflank_xscale(state.rflank_x + state.tsd_len)" :y1="state.margins.top + 8" :y2="state.margins.top + 8" stroke-width="4" stroke="#a0ffa0"/>
-      <text v-if="state.tsd_len > 0" :x="state.rflank_xscale(state.rflank_x)" :y="state.margins.top + 23" fill="#ffffff">TSD</text>
+      <g v-axis="state.lflank_xaxis" class="xaxis" :transform="`translate(0,${state.flank_axis_y})`"></g>
+      <g v-axis="state.rflank_xaxis" class="xaxis" :transform="`translate(0,${state.flank_axis_y})`"></g>
 
-      <!-- reference ME -->
-      <g v-axis="state.me_xaxis" class="xaxis" :transform="`translate(0,${state.height - 60})`">
+      <!-- TSD in right flanking sequence-->
+      <line v-if="state.tsd_len > 0" :x1="state.rflank_xscale(state.rflank_x)" :x2="state.rflank_xscale(state.rflank_x + state.tsd_len)" :y1="state.flank_feat_y" :y2="state.flank_feat_y" stroke-width="4" stroke="#a0ffa0"/>
+      <text v-if="state.tsd_len > 0" :x="state.rflank_xscale(state.rflank_x)" :y="state.flank_feat_lbl_y" fill="#ffffff">TSD</text>
+
+      <!-- inserted sequence axis -->
+      <g v-axis="state.ins_xaxis" class="xaxis" :transform="`translate(0,${state.ins_axis_y})`">
       </g>
-      <text v-if="state.mei.strand == '+'" class="me_label" :x="state.me_xscale(0)" :y="state.height - state.margins.bottom + 5" fill="#ffffff" text-anchor="start">{{ state.me_len + " bp " + state.mei.ME + " reference >>>"}}</text>
-      <text v-else class="me_label" :x="state.me_xscale(0)" :y="state.height - state.margins.bottom + 5" fill="#ffffff" text-anchor="end">{{ "<<< " + state.me_len + " bp " + state.mei.ME + " reference"}}</text>
+
+      <!-- reference ME axis -->
+      <g v-axis="state.me_xaxis" class="xaxis" :transform="`translate(0,${state.me_axis_y})`">
+      </g>
+      <text v-if="state.mei.strand == '+'" class="me_label" :x="state.me_xscale(0)" :y="state.me_lbl_y" fill="#ffffff" text-anchor="start">{{ state.me_len + " bp " + state.mei.ME + " reference >>>"}}</text>
+      <text v-else class="me_label" :x="state.me_xscale(0)" :y="state.me_lbl_y" fill="#ffffff" text-anchor="end">{{ "<<< " + state.me_len + " bp " + state.mei.ME + " reference"}}</text>
 
       <!-- match/alignment spans -->
-      <polygon v-for="s in state.spans" :points="s.points_str" :fill="pctid_color(s.pct_id, 0.6)" :stroke="pctid_color(s.pct_id, 1.0)" stroke-width="2" />
+      <polygon v-for="s in state.spans" :points="s.points_str" :fill="pctid_color(s.pct_id, 0.5)" :stroke="pctid_color(s.pct_id, 1.0)" stroke-width="2" />
 
       <!-- TSD, polyX in ME coords -->
-      <line v-if="state.tsd_len > 0" :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.tsd_len)" :y1="90" :y2="90" stroke-width="4" stroke="#a0ffa0"/>
-      <text v-if="state.tsd_len > 0" :x="state.ins_xscale(0)" :y="110" fill="#ffffff">TSD</text>
-      <line :x1="state.ins_xscale(state.polyx_x1)" :x2="state.ins_xscale(state.polyx_x2)" :y1="90" :y2="90" stroke-width="4" stroke="#a0ffff"/>
-      <text :x="state.ins_xscale(state.polyx_x1)" :y="110" fill="#ffffff">{{ state.polyx_x2 == state.ins_len ? "polyA" : "polyT" }}</text>
+      <line v-if="state.feat_len > 0" :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.tsd_len)" :y1="state.ins_tsd_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#a0ffa0"/>
+      <text v-if="state.tsd_len > 0" :x="state.ins_xscale(0)" :y="state.ins_feat_lbl_y" fill="#ffffff">TSD</text>
+      <line :x1="state.ins_xscale(state.polyx_x1)" :x2="state.ins_xscale(state.polyx_x2)" :y1="state.ins_feat_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#a0ffff"/>
+      <text :x="state.ins_xscale(state.polyx_x1)" :y="state.ins_feat_lbl_y" fill="#ffffff">{{ state.polyx_x2 == state.ins_len ? "polyA" : "polyT" }}</text>
       </svg>
   </div>
 </template>
