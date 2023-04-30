@@ -1,5 +1,6 @@
 v1.1.1 (April 21, 2023)
  -Add --csv_output option for CSV formatted output. (#7)
+ -Add Vue3/D3-based MEI visualization. (#7)
 
 v1.1.0 (April 21, 2023)
  -Report command-line option settings on stderr.
