@@ -8,7 +8,8 @@
   import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis';
   
   const props = defineProps({
-    meiStr: { type: String, required: true }
+    meiStr: { type: String, required: true },
+    label: { type: String, required: false }
   })
 
   const ME_LENGTHS = {
@@ -41,7 +42,7 @@
   // SVG coordinate system
   const width = 1200
   const height = 250
-  const margins = { left: 75, right: 75, top: 40, bottom: 20}
+  const margins = { left: 80, right: 75, top: 40, bottom: 20}
   let rx1 = margins.left
   let rx2 = width - margins.right
  
@@ -164,12 +165,29 @@
     s.points_str = s.points.join(" ")
   })
 
+  const me_ref_str = ": " + mei['%ME'] + " coverage at " + mei['%id_ng'] + " identity"
+
+  // color key
+  const cb_height = 20
+  const cb_width = 15
+  const cb_y = height - margins.bottom - (cb_height * 5)
+  const color_key_blocks = [
+    { 'id': 95, 'color': pctid_color(95, 1), 'y': cb_y, height: cb_height },
+    { 'id': 90, 'color': pctid_color(90, 1), 'y': cb_y + cb_height, 'height': cb_height },
+    { 'id': 80, 'color': pctid_color(80, 1), 'y': cb_y + cb_height * 2, 'height': cb_height },
+    { 'id': 70, 'color': pctid_color(70, 1), 'y': cb_y + cb_height * 3, 'height': cb_height },
+    { 'id': 60, 'color': pctid_color(60, 1), 'y': cb_y + cb_height * 4, 'height': cb_height },
+  ]
+
   const state = reactive({
     // SVG
     width: width,
     height: height,
     margins: margins,
 
+    // props
+    label: props.label,
+    // MEI
     mei: mei, 
     ins_len: ins_len,
     tsd_len: mei.TSD_seq.length,
@@ -192,7 +210,6 @@
     me_xaxis: me_xaxis,
     me_x1: me_x1,
     me_x2: me_x2,
-    me_cov_str: mei['%ME'] + " coverage",
     // y offsets
     // insertion feature on ref genome axis (top)
     ins_label_y: margins.top - 10,
@@ -209,14 +226,17 @@
     me_axis_y: me_axis_y,
     me_lbl_y: me_axis_y + 50,
     // alignment spans
-    spans: spans
+    spans: spans,
+    me_ref_str: me_ref_str,
+    // color key
+    color_key_blocks: color_key_blocks
   })
   
 </script>
 
 <template>
   <div class="greetings pb-4">
-    <h3 class="green">[{{state.mei.ME}}] {{ state.mei.chrom }}:{{ state.mei.pos }}:{{ state.mei.strand }}:{{state.ins_len}} bp</h3>
+    <h3 class="green">{{state.label}} [{{state.mei.ME}}] {{ state.mei.chrom }}:{{ state.mei.pos }}:{{ state.mei.strand }}:{{state.ins_len}} bp</h3>
 
     <svg
       ref="mei_svg"
@@ -226,6 +246,10 @@
       class="pa-0 ma-0"
       style="border: 1px solid white"
       >
+
+      <!-- ad-hoc color key -->
+      <rect v-for="ck in color_key_blocks" :x="10" :y="ck.y" :width="20" :height="ck.height" :fill="ck.color"></rect>
+      <text v-for="ck in color_key_blocks" :x="35" :y="ck.y + ck.height -5" fill="#d0d0d0">{{ck.id + "%"}}</text>
 
       <!-- insertion feature on ref genome -->
       <line :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.ins_len)" :y1="state.ins_y" :y2="state.ins_y" stroke-width="3" stroke="#ffffff" />
@@ -245,8 +269,8 @@
       <!-- reference ME axis -->
       <g v-axis="state.me_xaxis" class="xaxis" :transform="`translate(0,${state.me_axis_y})`">
       </g>
-      <text v-if="state.mei.strand == '+'" class="me_label" :x="state.me_xscale(0)" :y="state.me_lbl_y" fill="#ffffff" text-anchor="start">{{ state.me_len + " bp " + state.mei.ME + " reference >>>"}}</text>
-      <text v-else class="me_label" :x="state.me_xscale(0)" :y="state.me_lbl_y" fill="#ffffff" text-anchor="end">{{ "<<< " + state.me_len + " bp " + state.mei.ME + " reference"}}</text>
+      <text v-if="state.mei.strand == '+'" class="me_label" :x="state.me_xscale(0)" :y="state.me_lbl_y" fill="#ffffff" text-anchor="start">{{ state.me_len + " bp " + state.mei.ME + " reference " + me_ref_str + " >>>"}}</text>
+      <text v-else class="me_label" :x="state.me_xscale(0)" :y="state.me_lbl_y" fill="#ffffff" text-anchor="end">{{ "<<< " + state.me_len + " bp " + state.mei.ME + " reference " + me_ref_str}}</text>
 
       <!-- match/alignment spans -->
       <polygon v-for="s in state.spans" :points="s.points_str" :fill="pctid_color(s.pct_id, 0.5)" :stroke="pctid_color(s.pct_id, 1.0)" stroke-width="2" />
