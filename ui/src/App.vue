@@ -1,11 +1,11 @@
 <script setup>
-  import MEI_List from './components/MEI_List.vue'
+  import MEI_Viewer from './components/MEI_Viewer.vue'
 </script>
 
 <template>
-  <main>
-    <MEI_List />
-  </main>
+  <v-app class="pa-0 ma-0">
+    <MEI_Viewer />
+  </v-app>
 </template>
 
 <style scoped>

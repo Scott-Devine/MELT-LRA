@@ -11,3 +11,5 @@ npm install d3 --save
 npm install 'vuetify@^3.1.14' --save
 perform Manual steps from https://vuetifyjs.com/en/getting-started/installation/
 
+# no v-data-table until Vuetify 3.1:
+npm install vue3-easy-data-table

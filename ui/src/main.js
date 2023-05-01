@@ -12,6 +12,10 @@ import * as directives from 'vuetify/directives'
 import { select } from 'd3-selection';
 import 'd3-transition';
 
+// EasyDataTable
+import Vue3EasyDataTable from 'vue3-easy-data-table'
+import 'vue3-easy-data-table/dist/style.css'
+
 const vuetify = createVuetify({
   components,
   directives
@@ -20,11 +24,16 @@ const vuetify = createVuetify({
 import './assets/main.css'
 
 const app = createApp(App).use(vuetify)
+
+// D3 axes
 app.directive('axis', (el, binding) => {
     const axisMethod = binding.value
     select(el)
       .transition()
       .call(axisMethod)
 })
+
+// EasyDataTable
+app.component('EasyDataTable', Vue3EasyDataTable)
 
 app.mount('#app')
