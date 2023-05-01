@@ -136,7 +136,7 @@
   const me_axis_y = height - margins.bottom - 50
 
   // convert spans to polygons
-  const match_y1 = ins_axis_y + feat_y_offset
+  const match_y1 = ins_axis_y + feat_y_offset + 6
   const match_y2 = me_axis_y - feat_y_offset
 
   spans.forEach(s => {
