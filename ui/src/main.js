@@ -2,11 +2,12 @@ import { createApp } from 'vue'
 
 import App from './App.vue'
 
-// Vuetify
+// Vuetify3
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import '@mdi/font/css/materialdesignicons.min.css'
 
 // D3
 import { select } from 'd3-selection';
@@ -18,7 +19,10 @@ import 'vue3-easy-data-table/dist/style.css'
 
 const vuetify = createVuetify({
   components,
-  directives
+  directives,
+  theme: {
+    defaultTheme: 'light'
+  },
 })
 
 import './assets/main.css'
