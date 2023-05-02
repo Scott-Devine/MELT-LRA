@@ -1,30 +1,73 @@
 <script setup>
 
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue';
 import MEI from './MEI.vue'
 import MiniMEI from './MiniMEI.vue'
 
 const headers = [
-    { text: 'chrom', value: 'chrom', sortable: true, fixed: true },
-    { text: 'pos', value: 'pos', sortable: true, fixed: true },
-    { text: 'strand', value: 'strand', sortable: true, fixed: true },
-    { text: 'ME', value: 'ME', sortable: true, fixed: true },
-    { text: 'size', value: 'insertion_size', sortable: true, fixed: true },
-    { text: '%ME', value: '%ME', sortable: true, fixed: true },
-    { text: '%id', value: '%id', sortable: true, fixed: true },
-    { text: '%id_ng', value: '%id_ng', sortable: true, fixed: true },
-    { text: '%cov', value: '%cov', sortable: true, fixed: true },
-    { text: 'TSD_seq', value: 'TSD_seq', sortable: true, fixed: true},
-    { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
-    { text: 'polyX_bp', value: 'polyX_length', sortable: true, fixed: true},
-    { text: 'MEI', value: 'MEI', fixed: true, width: 360 }
+{ text: 'chrom', value: 'chrom', sortable: true, fixed: true },
+{ text: 'pos', value: 'pos', sortable: true, fixed: true },
+{ text: 'strand', value: 'strand', sortable: true, fixed: true },
+{ text: 'ME', value: 'ME', sortable: true, fixed: true },
+{ text: 'size', value: 'insertion_size', sortable: true, fixed: true },
+{ text: '%ME', value: '%ME', sortable: true, fixed: true },
+{ text: '%id', value: '%id', sortable: true, fixed: true },
+{ text: '%id_ng', value: '%id_ng', sortable: true, fixed: true },
+{ text: '%cov', value: '%cov', sortable: true, fixed: true },
+{ text: 'TSD_seq', value: 'TSD_seq', sortable: true, fixed: true},
+{ text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
+{ text: 'polyX_bp', value: 'polyX_length', sortable: true, fixed: true},
+{ text: 'MEI', value: 'MEI', fixed: true, width: 360 }
 ]
+
+const sortBy = []
+const sortType = []
 
 const state = reactive({
     meis: [],
+    total_mei_counts: {'ALU': 0, 'LINE1':0, 'SVA': 0},
+    selected_meis: [],
+    selected_mei_counts: {'ALU': 0, 'LINE1':0, 'SVA': 0},
+    selected_me_types: {'ALU': true, 'LINE1': true, 'SVA': true},
     headers: headers,
-    pctid: 90.0
+    min_pctid: 90.0,
+    me_pctcov_range: [0.0, 100.0],
+    me_ins_length_range: [0.0, 7000.0],
+    tsd_length_range: [0.0, 500.0],
+    polyx_length_range: [0.0, 500.0],
+    display_mode: 'table'
 })
+
+function update_selected_meis() {
+    let f_meis = []
+    let n_selected = {'ALU': 0, 'LINE1':0, 'SVA': 0}
+    state.meis.forEach(m => {
+        if ((m['%id_ng'] >= state.min_pctid) 
+        && (m['%ME'] >= state.me_pctcov_range[0]) && (m['%ME'] <= state.me_pctcov_range[1])
+        && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
+        && (m['TSD_length'] >= state.tsd_length_range[0]) && (m['TSD_length'] <= state.tsd_length_range[1])
+        && (m['polyX_length'] >= state.polyx_length_range[0]) && (m['polyX_length'] <= state.polyx_length_range[1])
+        && (state.selected_me_types[m['ME']])
+        ) {
+            f_meis.push(m)
+            n_selected[m.ME]++
+        }
+    })
+    state.selected_meis = f_meis
+    state.selected_mei_counts = n_selected
+    if (state.selected_meis.length == state.meis.length) state.total_mei_counts = n_selected
+}
+
+watch(() => state.min_pctid, (newValue) => { update_selected_meis() })
+watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
+watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
+watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
+watch(() => state.polyx_length_range, (newValue) => { update_selected_meis() })
+watch(() => state.meis, (newValue) => { update_selected_meis() })
+watch(() => state.selected_me_types.ALU, (newValue) => { update_selected_meis() })
+watch(() => state.selected_me_types.LINE1, (newValue) => { update_selected_meis() })
+watch(() => state.selected_me_types.SVA, (newValue) => { update_selected_meis() })
+watch(() => state.show_alu, (newValue) => { console.log("show alu = " + state.show_alu) })
 
 const csv_headers = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string']
 function parse_mei(mei_str) {
@@ -38,13 +81,28 @@ function parse_mei(mei_str) {
         mei[csv_headers[i]] = f[i];
     }
     let pxc = mei['polyX_coords'].split('-')
-
+    
     mei['pos'] = mei['pos'] * 1.0
     mei['insertion_size'] = mei['insertion_seq'].length
     mei['TSD_length'] = mei['TSD_seq'].length
     mei['polyX_length'] = pxc[1] - pxc[0] >= 0 ? pxc[1] - pxc[0] : 0
     mei['key'] = mei['chrom'] + ':' + mei['pos']
     return mei
+}
+function formatRatio(n1,n2) {
+    return String(n1).padStart(String(n2).length, " ") + "/" + n2;
+}
+
+function getCountRatio(m) {
+    const n1 = state.selected_mei_counts[m];
+    const n2 = state.total_mei_counts[m];
+    return formatRatio(n1, n2)
+}
+
+function getMEColor(me) {
+    if (me == 'ALU') return "#1b9e77"
+    if (me == 'LINE1') return "#d95f02"
+    return "#7570b3";
 }
 
 // hard-coded data source
@@ -53,60 +111,165 @@ const mei_file = "../assets/data/HG00514-CCS-PAV-MEs-90-90-95bp-v1.1.1.csv"
 const mei_url = new URL(mei_file, import.meta.url).href
 
 fetch(mei_url)
-    .then(res => {
-        return res.text()
-    }).then(txt => {
-        state.meis = txt.split("\n").slice(1).filter(l => !l.match(/^\s*$/)).map(ms => parse_mei(ms))
-    })
-    .catch(err => {
-        console.log("caught error " + err)
-    })
+.then(res => {
+    return res.text()
+}).then(txt => {
+    state.meis = txt.split("\n").slice(1).filter(l => !l.match(/^\s*$/)).map(ms => parse_mei(ms))
+})
+.catch(err => {
+    console.log("caught error " + err)
+})
 </script>
 
 <template>
-    <v-app-bar color="info" :title="mei_url">
+    <v-app-bar color="primary" :title="'MEI callset: ' + mei_url">
     </v-app-bar>
-
     <v-main class="px-0 mx-0">
-        <v-container fluid style="width: 100vw;"></v-container>
-        <v-card class="pa-4">
-        
-            <v-slider v-model="state.pctid" label="Min %identity:" :min="90" :max="100" :step="1" thumb-label>
-            <template v-slot:append>
-                <v-text-field v-model="state.pctid" hide-details type="number" style="width: 120px;"></v-text-field>
-            </template>
-        </v-slider>
+        <v-container fluid style="width: 100vw;" class="pa-0 ma-0"></v-container>
+        <v-card title="Filter MEIs" class="pa-2 ma-2" variant="outlined" prepend-icon="mdi-tune">
+            
+            <v-container class="pa-0 ma-0">
+                <v-row class="pa-0 ma-0">
+                    <!-- ME counts by type -->
+                    <v-col cols="4" class="pa-0 ma-0">
+                        
+                        <v-container class="pa-1 ma-0">
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="12" class="pa-0 ma-0">
+                                    <v-chip label size="large" color="black" class="font-weight-bold mr-1">{{ formatRatio(state.selected_meis.length, state.meis.length) }}</v-chip> 
+                                    <span class="text-h6 ml-2">MEIs selected</span><br clear="both"/>
+                                </v-col>
+                            </v-row>
+                            
+                            <v-row v-for="me_type in ['ALU', 'LINE1', 'SVA']" class="pa-0 ma-0">
+                                <v-col cols="6" class="pa-0 ma-0 pt-3">
+                                    <v-chip label size="large" :disabled="!state.selected_mei_counts[me_type]" :color="getMEColor(me_type)" class="font-weight-bold">{{ getCountRatio(me_type) }}</v-chip>
+                                    <span class="text-h6 ml-2">{{ me_type }}</span>
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-checkbox v-model="state.selected_me_types[me_type]" hide-details dense class="pa-0 ma-0" style="width: 2rem;"></v-checkbox>
+                                </v-col>
+                            </v-row>
+                            
+                        </v-container>
+                    </v-col>
+                    
+                    <v-col cols="8" class="pa-0 ma-0">
+                        <v-container class="pa-0 ma-0">
 
-        <v-chip size="x-large" color="primary">? / {{ state.meis.length }}</v-chip> <span class="text-subtitle-1">MEIs selected</span>
-     
-        <EasyDataTable
-           :headers="state.headers"
-            :items="state.meis"
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="3" class="pa-0 ma-0">
+                                    Insertion size range:
+                                </v-col>
+                                <v-col cols="6" class="pa-0 ma-0">
+                                    <v-range-slider v-model="state.me_ins_length_range" :min="0" :max="7000" :step="50" thumb-label hide-details></v-range-slider>
+                                </v-col>
+                                <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    {{ state.me_ins_length_range[0] }}bp - {{ state.me_ins_length_range[1] }}bp
+                                </v-col>
+                            </v-row>
+
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="3" class="pa-0 ma-0">
+                                    Min ungapped %identity:
+                                </v-col>
+                                <v-col cols="6" class="pa-0 ma-0">
+                                    <v-slider v-model="state.min_pctid" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
+                                </v-col>
+                                <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    {{ state.min_pctid }}%
+                                </v-col>
+                            </v-row>
+
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="3" class="pa-0 ma-0">
+                                    ME %coverage range:
+                                </v-col>
+                                <v-col cols="6" class="pa-0 ma-0">
+                                    <v-range-slider v-model="state.me_pctcov_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
+                                </v-col>
+                                <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    {{ state.me_pctcov_range[0] }}% - {{ state.me_pctcov_range[1] }}%
+                                </v-col>
+                            </v-row>
+
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="3" class="pa-0 ma-0">
+                                    TSD length range:
+                                </v-col>
+                                <v-col cols="6" class="pa-0 ma-0">
+                                    <v-range-slider v-model="state.tsd_length_range" :min="0" :max="500" :step="1" thumb-label hide-details></v-range-slider>
+                                </v-col>
+                                <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    {{ state.tsd_length_range[0] }}bp - {{ state.tsd_length_range[1] }}bp
+                                </v-col>
+                            </v-row>
+
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="3" class="pa-0 ma-0">
+                                    polyX length range:
+                                </v-col>
+                                <v-col cols="6" class="pa-0 ma-0">
+                                    <v-range-slider v-model="state.polyx_length_range" :min="0" :max="500" :step="1" thumb-label hide-details></v-range-slider>
+                                </v-col>
+                                <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    {{ state.polyx_length_range[0] }}bp - {{ state.polyx_length_range[1] }}bp
+                                </v-col>
+                            </v-row>         
+                            
+                            <v-row class="pa-0 ma-0">
+                                <v-col cols="3" class="pa-0 ma-0">
+                                    Display:
+                                </v-col>
+                                <v-col cols="9" class="pa-0 ma-0">
+                                    <v-radio-group v-model="state.display_mode" inline>
+                                        <v-radio label="Sortable table" value="table" density="compact"></v-radio>
+                                        <v-radio label="Full-size figures [much slower]" value="figures" density="compact" class="pl-2"></v-radio>
+                                    </v-radio-group>
+                                </v-col>
+                            </v-row>       
+                        </v-container>
+ 
+                    </v-col>
+                </v-row>
+            </v-container>
+            
+        </v-card>
+                
+        <!-- sortable table view -->
+        <v-card v-if="state.display_mode == 'table'" class="pa-2">
+            <EasyDataTable
+            :headers="state.headers"
+            :items="state.selected_meis"
             alternating
             border-cell
+            :sort-by="sortBy"
+            :sort-type="sortType"
+            multi-sort
             buttons-pagination
             show-index
             style="width: 100%;"
             class="mt-4"
-        >
+            >
             <template #item-MEI="item">
-                <MiniMEI :key="item.key" :mei="item" />
+                <MiniMEI :key="item.key + '-' + mini" :mei="item" />
             </template>
-
+            
             <template #expand="item">
                 <div class="px-2">
                     <MEI :key="item.key" :mei="item" />
                 </div>
             </template>
         </EasyDataTable>
-
+    </v-card>
+    <!-- list of figures view -->
+    <v-card v-else class="pa-2" style="background-color: black;">
+        <div v-for="(mei, m) in state.selected_meis">
+            <MEI :mei="mei" :key="mei.key" :label="(m + 1) + '/' + state.selected_meis.length" />
+        </div>
     </v-card>
 
-<!--    <div v-for="(mei, m) in state.meis">
-        <MEI v-if="mei['%id_ng'] >= state.pctid" :mei="mei" :label="(m+1) + ' / ' + state.meis.length" />
-    </div>
--->
-    </v-main>
+</v-main>
 </template>
-  
+
 <style scoped></style>
