@@ -259,8 +259,8 @@
       <!-- TSD, polyX in ME coords -->
       <line v-if="state.tsd_len > 0" :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.tsd_len)" :y1="state.ins_feat_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#8ccf9e"/>
       <text v-if="state.tsd_len > 0" :x="state.ins_xscale(0)" :y="state.ins_feat_lbl_y" fill="#ffffff">TSD</text>
-      <line :x1="state.ins_xscale(state.polyx_x1)" :x2="state.ins_xscale(state.polyx_x2)" :y1="state.ins_feat_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#8080ff"/>
-      <text :x="state.ins_xscale(state.polyx_x1)" :y="state.ins_feat_lbl_y" fill="#ffffff">{{ state.polyx_x2 == state.ins_len ? "polyA" : "polyT" }}</text>
+      <line v-if="state.mei.polyX_length > 0" :x1="state.ins_xscale(state.polyx_x1)" :x2="state.ins_xscale(state.polyx_x2)" :y1="state.ins_feat_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#8080ff"/>
+      <text v-if="state.mei.polyX_length > 0" :x="state.ins_xscale(state.polyx_x1)" :y="state.ins_feat_lbl_y" fill="#ffffff">{{ state.polyx_x2 == state.ins_len ? "polyA" : "polyT" }}</text>
       </svg>
   </div>
 </template>
