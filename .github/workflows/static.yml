@@ -1,5 +1,5 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: github-pages-deploy-static
 
 on:
   # Allows you to run this workflow manually from the Actions tab
@@ -28,14 +28,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          ref: github-pages
+          ref: main
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          # Upload github-pages dir only
-          path: 'github-pages/'
+          # Upload github_pages_site dir only
+          path: 'github_pages_site/'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
