@@ -249,8 +249,8 @@ fetch(mei_url)
             <v-card v-if="state.display_mode == 'table'" class="pa-2">
                 <!-- supplemental pagination controls -->
                 <div class="pa-2" style="background-color: #e0e0e0;">
-                    <v-btn @click="prevPage()">&lt; previous page</v-btn>
-                    <v-btn @click="nextPage()" class="ml-2">next page &gt;</v-btn>
+                    <v-btn @click="prevPage()" density="compact" prepend-icon="mdi-arrow-left-bold">previous page</v-btn>
+                    <v-btn @click="nextPage()" density="compact" append-icon="mdi-arrow-right-bold" class="ml-2">next page</v-btn>
                     <span class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
                 </div>
                 <EasyDataTable
@@ -278,8 +278,8 @@ fetch(mei_url)
             </EasyDataTable>
             <!-- supplemental pagination controls -->
             <div class="pa-2" style="background-color: #e0e0e0;">
-                <v-btn @click="prevPage()">&lt; previous page</v-btn>
-                <v-btn @click="nextPage()" class="ml-2">next page &gt;</v-btn>
+                <v-btn @click="prevPage()" density="compact" prepend-icon="mdi-arrow-left-bold">previous page</v-btn>
+                <v-btn @click="nextPage()" density="compact" append-icon="mdi-arrow-right-bold" class="ml-2">next page</v-btn>
                 <span class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
             </div>
         </v-card>
