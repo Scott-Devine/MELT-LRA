@@ -1,6 +1,6 @@
 <script setup>
 
-import { reactive, watch } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import MEI from './MEI.vue'
 import MiniMEI from './MiniMEI.vue'
 import { format } from 'd3-format'
@@ -19,8 +19,15 @@ const headers = [
 { text: 'TSD_seq', value: 'TSD_seq', sortable: true, fixed: true},
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
 { text: 'polyX_bp', value: 'polyX_length', sortable: true, fixed: true},
-{ text: 'MEI', value: 'MEI', fixed: true, width: 360 }
+{ text: 'MEI', value: 'MEI', fixed: true, width: 400 }
 ]
+
+// EasyDataTable pagination
+const dataTable = ref()
+const nextPage = () => { dataTable.value.nextPage() }
+const prevPage = () => { dataTable.value.prevPage() }
+const maxPage = computed(() => dataTable.value?.maxPaginationNumber);
+const currentPage = computed(() => dataTable.value?.currentPaginationNumber);
 
 const sortBy = []
 const sortType = []
@@ -75,8 +82,6 @@ watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.polyx_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.meis, (newValue) => { update_selected_meis() })
-//watch(() => state.selected_me_types.ALU, (newValue) => { update_selected_meis() })
-//watch(() => state.selected_me_types.LINE1, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
 watch(() => state.show_alu, (newValue) => { console.log("show alu = " + state.show_alu) })
 
@@ -136,7 +141,7 @@ fetch(mei_url)
     <v-app-bar color="primary" :title="'MEI callset: ' + mei_url">
     </v-app-bar>
     <v-main class="px-0 mx-0">
-        <v-card variant="tonal" class="pa-2 ma-2">
+        <v-card variant="outlined" class="pa-2 ma-2">
             <v-card-title>
                 <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Filter MEIs:</span>
                 <v-chip label size="large" color="black" class="font-weight-medium ml-4">{{ formatRatio(state.selected_meis.length, state.meis.length) }}</v-chip> 
@@ -242,7 +247,14 @@ fetch(mei_url)
             
             <!-- sortable table view -->
             <v-card v-if="state.display_mode == 'table'" class="pa-2">
+                <!-- supplemental pagination controls -->
+                <div class="pa-2" style="background-color: #e0e0e0;">
+                    <v-btn @click="prevPage()">&lt; previous page</v-btn>
+                    <v-btn @click="nextPage()" class="ml-2">next page &gt;</v-btn>
+                    <span class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
+                </div>
                 <EasyDataTable
+                ref="dataTable"
                 :headers="state.headers"
                 :items="state.selected_meis"
                 alternating
@@ -262,8 +274,14 @@ fetch(mei_url)
                     <div class="px-2">
                         <MEI :key="item.key" :mei="item" />
                     </div>
-                </template>
+                </template>           
             </EasyDataTable>
+            <!-- supplemental pagination controls -->
+            <div class="pa-2" style="background-color: #e0e0e0;">
+                <v-btn @click="prevPage()">&lt; previous page</v-btn>
+                <v-btn @click="nextPage()" class="ml-2">next page &gt;</v-btn>
+                <span class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
+            </div>
         </v-card>
         <!-- list of figures view -->
         <v-card v-else class="pa-2" style="background-color: black;">
@@ -275,4 +293,5 @@ fetch(mei_url)
     </v-main>
 </template>
 
-<style scoped></style>
+<style scoped>
+</style>
