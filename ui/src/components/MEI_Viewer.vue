@@ -12,13 +12,13 @@ const headers = [
 { text: 'pos', value: 'pos', sortable: true, fixed: true },
 { text: 'strand', value: 'strand', sortable: true, fixed: true },
 { text: 'ME', value: 'ME', sortable: true, fixed: true },
-{ text: 'size', value: 'insertion_size', sortable: true, fixed: true },
+{ text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true },
 { text: '%ME', value: '%ME', sortable: true, fixed: true },
-{ text: '%id_ng', value: '%id_ng', sortable: true, fixed: true },
-{ text: '%cov', value: '%cov', sortable: true, fixed: true },
+{ text: '%identity', value: '%id_ng', sortable: true, fixed: true },
+{ text: '%coverage', value: '%cov', sortable: true, fixed: true },
 { text: 'TSD_seq', value: 'TSD_seq', sortable: true, fixed: true},
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
-{ text: 'polyX_bp', value: 'polyX_length', sortable: true, fixed: true},
+{ text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true},
 { text: 'MEI', value: 'MEI', fixed: true, width: 400 }
 ]
 
@@ -26,7 +26,7 @@ const headers = [
 const dataTable = ref()
 const nextPage = () => { dataTable.value.nextPage() }
 const prevPage = () => { dataTable.value.prevPage() }
-const gotoPage = (p) => { dataTable.value.updatePage(p) }
+const gotoPage = (p) => { if (dataTable.value != null) dataTable.value.updatePage(p) }
 const maxPage = computed(() => dataTable.value?.maxPaginationNumber);
 const currentPage = computed(() => dataTable.value?.currentPaginationNumber);
 
@@ -41,6 +41,7 @@ const state = reactive({
     selected_me_types: ['ALU', 'LINE1', 'SVA'],
     headers: headers,
     min_pctid: 90.0,
+    min_pctcov: 90.0,
     me_pctcov_range: [0.0, 100.0],
     me_ins_length_range: [0.0, 7000.0],
     tsd_length_range: [0.0, 500.0],
@@ -63,6 +64,7 @@ function update_selected_meis() {
     })
     state.meis.forEach(m => {
         if ((m['%id_ng'] >= state.min_pctid) 
+        && (m['%cov'] >= state.min_pctcov) 
         && (m['%ME'] >= state.me_pctcov_range[0]) && (m['%ME'] <= state.me_pctcov_range[1])
         && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
         && (m['TSD_length'] >= state.tsd_length_range[0]) && (m['TSD_length'] <= state.tsd_length_range[1])
@@ -79,6 +81,7 @@ function update_selected_meis() {
 }
 
 watch(() => state.min_pctid, (newValue) => { update_selected_meis() })
+watch(() => state.min_pctcov, (newValue) => { update_selected_meis() })
 watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
 watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
@@ -195,6 +198,18 @@ fetch(mei_url)
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
+                                        Min %coverage:
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                        <v-slider v-model="state.min_pctcov" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
+                                    </v-col>
+                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                        {{ state.min_pctcov }}%
+                                    </v-col>
+                                </v-row>
+
+                                <v-row class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0">
                                         ME %coverage range:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
@@ -219,7 +234,7 @@ fetch(mei_url)
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
-                                        polyX length range:
+                                        polyA/T length range:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.polyx_length_range" :min="0" :max="500" :step="1" thumb-label hide-details></v-range-slider>
