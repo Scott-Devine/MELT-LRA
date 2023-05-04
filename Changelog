@@ -1,6 +1,7 @@
 v1.1.2 (May 3, 2023)
  -Add percentages to ME type counts in Vue3 viewer.
- -Add supplemental pagination controls to Vue3 data table. (#13) 
+ -Add supplemental pagination controls to Vue3 data table. (#13)
+ -Remove spurious polyA features from figures. (#12)
 
 v1.1.1 (May 3, 2023)
  -Add --csv_output option for CSV formatted output. (#7)
