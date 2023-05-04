@@ -26,6 +26,7 @@ const headers = [
 const dataTable = ref()
 const nextPage = () => { dataTable.value.nextPage() }
 const prevPage = () => { dataTable.value.prevPage() }
+const gotoPage = (p) => { dataTable.value.updatePage(p) }
 const maxPage = computed(() => dataTable.value?.maxPaginationNumber);
 const currentPage = computed(() => dataTable.value?.currentPaginationNumber);
 
@@ -48,6 +49,7 @@ const state = reactive({
 })
 const me_types = ['ALU', 'LINE1', 'SVA']
 function update_selected_meis() {
+    gotoPage(1)
     let f_meis = []
     let selected = {}
     let n_selected = {}
@@ -249,9 +251,11 @@ fetch(mei_url)
             <v-card v-if="state.display_mode == 'table'" class="pa-2">
                 <!-- supplemental pagination controls -->
                 <div class="pa-2" style="background-color: #e0e0e0;">
-                    <v-btn @click="prevPage()" density="compact" prepend-icon="mdi-arrow-left-bold">previous page</v-btn>
-                    <v-btn @click="nextPage()" density="compact" append-icon="mdi-arrow-right-bold" class="ml-2">next page</v-btn>
-                    <span class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
+                    <v-btn @click="gotoPage(1)" density="compact" :disabled="maxPage == 0">Page 1</v-btn>
+                    <v-btn @click="prevPage()" density="compact" prepend-icon="mdi-arrow-left-bold" class="ml-2" :disabled="maxPage == 0">previous page</v-btn>
+                    <v-btn @click="nextPage()" density="compact" append-icon="mdi-arrow-right-bold" class="ml-2" :disabled="maxPage == 0">next page</v-btn>
+                    <span v-if="maxPage > 0" class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
+                    <span v-else>No MEIs selected</span>
                 </div>
                 <EasyDataTable
                 ref="dataTable"
@@ -278,9 +282,11 @@ fetch(mei_url)
             </EasyDataTable>
             <!-- supplemental pagination controls -->
             <div class="pa-2" style="background-color: #e0e0e0;">
-                <v-btn @click="prevPage()" density="compact" prepend-icon="mdi-arrow-left-bold">previous page</v-btn>
-                <v-btn @click="nextPage()" density="compact" append-icon="mdi-arrow-right-bold" class="ml-2">next page</v-btn>
-                <span class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
+                <v-btn @click="gotoPage(1)" density="compact" :disabled="maxPage == 0">Page 1</v-btn>
+                <v-btn @click="prevPage()" density="compact" prepend-icon="mdi-arrow-left-bold" class="ml-2" :disabled="maxPage == 0">previous page</v-btn>
+                <v-btn @click="nextPage()" density="compact" append-icon="mdi-arrow-right-bold" class="ml-2" :disabled="maxPage == 0">next page</v-btn>
+                <span v-if="maxPage > 0" class="px-3 font-weight-medium">Page {{ currentPage }} / {{ maxPage }}</span>
+                <span v-else>No MEIs selected</span>
             </div>
         </v-card>
         <!-- list of figures view -->
