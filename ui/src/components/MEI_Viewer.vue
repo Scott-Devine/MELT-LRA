@@ -14,7 +14,8 @@ const headers = [
 { text: 'ME', value: 'ME', sortable: true, fixed: true },
 { text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true },
 { text: '%ME', value: '%ME', sortable: true, fixed: true },
-{ text: '%identity', value: '%id_ng', sortable: true, fixed: true },
+{ text: '%id', value: '%id', sortable: true, fixed: true },
+{ text: '%id_nogaps', value: '%id_ng', sortable: true, fixed: true },
 { text: '%coverage', value: '%cov', sortable: true, fixed: true },
 { text: 'TSD_seq', value: 'TSD_seq', sortable: true, fixed: true},
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
@@ -40,7 +41,8 @@ const state = reactive({
     selected_mei_counts: {'ALU': 0, 'LINE1':0, 'SVA': 0},
     selected_me_types: ['ALU', 'LINE1', 'SVA'],
     headers: headers,
-    min_pctid: 90.0,
+    pctid_range: [0.0, 100.0],
+    min_pctid_nogaps: 90.0,
     min_pctcov: 90.0,
     me_pctcov_range: [0.0, 100.0],
     me_ins_length_range: [0.0, 7000.0],
@@ -63,8 +65,9 @@ function update_selected_meis() {
         selected[mt] = true
     })
     state.meis.forEach(m => {
-        if ((m['%id_ng'] >= state.min_pctid) 
+        if ((m['%id_ng'] >= state.min_pctid_nogaps) 
         && (m['%cov'] >= state.min_pctcov) 
+        && (m['%id'] >= state.pctid_range[0]) && (m['%id'] <= state.pctid_range[1])
         && (m['%ME'] >= state.me_pctcov_range[0]) && (m['%ME'] <= state.me_pctcov_range[1])
         && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
         && (m['TSD_length'] >= state.tsd_length_range[0]) && (m['TSD_length'] <= state.tsd_length_range[1])
@@ -80,7 +83,8 @@ function update_selected_meis() {
     if (state.selected_meis.length == state.meis.length) state.total_mei_counts = n_selected
 }
 
-watch(() => state.min_pctid, (newValue) => { update_selected_meis() })
+watch(() => state.min_pctid_nogaps, (newValue) => { update_selected_meis() })
+watch(() => state.pctid_range, (newValue) => { update_selected_meis() })
 watch(() => state.min_pctcov, (newValue) => { update_selected_meis() })
 watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
 watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
@@ -186,10 +190,22 @@ fetch(mei_url)
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
+                                        Percent identity range:
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                        <v-range-slider v-model="state.pctid_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
+                                    </v-col>
+                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                        {{ state.pctid_range[0] }}% - {{ state.pctid_range[1] }}%
+                                    </v-col>
+                                </v-row>
+
+                                <v-row class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0">
                                         Min ungapped %identity:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
-                                        <v-slider v-model="state.min_pctid" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
+                                        <v-slider v-model="state.min_pctid_nogaps" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
                                     </v-col>
                                     <v-col cols="3" class="pa-0 ma-0 pl-3">
                                         {{ state.min_pctid }}%
@@ -198,7 +214,7 @@ fetch(mei_url)
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
-                                        Min %coverage:
+                                        Min insertion %coverage:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
                                         <v-slider v-model="state.min_pctcov" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
@@ -210,7 +226,7 @@ fetch(mei_url)
 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
-                                        ME %coverage range:
+                                        Reference ME %coverage range:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.me_pctcov_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
