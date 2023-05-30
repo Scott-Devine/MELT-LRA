@@ -1,4 +1,4 @@
-v1.1.2 (May ?, 2023)
+v1.2.0 (May ?, 2023)
  -Add ungapped percent identity to Vue3 viewer. (#15)
  -Add percentages to ME type counts in Vue3 viewer.
  -Add supplemental pagination controls to Vue3 data table. (#13)

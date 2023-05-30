@@ -13,7 +13,7 @@ import sys
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.1.1'
+VERSION = '1.2.0'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -662,17 +662,10 @@ def print_insertion(ins, ref_seqs, csv_fh):
         sa_to = ref_seq_pos + bp_after
         return ref_seq['seq'][ref_seq_pos:sa_to]
 
+    # display region around insertion point (i.e., the point after the REF base)
     seq_before = get_l_context_bp(l_context_bp)
     seq_after = get_r_context_bp(r_context_bp)
     
-    # display region around insertion point (i.e., the point after the REF base)
-#    bp_before = l_context_bp if ref_seq_pos > l_context_bp else ref_seq_pos
-#    bp_after = r_context_bp if (ref_seq_pos + r_context_bp < ref_seq_len) else ref_seq_len - ref_seq_pos
-#    sb_from = ref_seq_pos - bp_before
-#    seq_before = ref_seq['seq'][sb_from:ref_seq_pos]
-#    sa_to = ref_seq_pos + bp_after
-#    seq_after = ref_seq['seq'][ref_seq_pos:sa_to]
-
     # last base of seq_before should be REF
     if seq_before[-1].upper() != ins['ref']:
         fatal("seq_before[-1] (" + seq_before[-1] + ") != REF (" + ins['ref'] + ")")
@@ -739,9 +732,6 @@ def print_insertion(ins, ref_seqs, csv_fh):
     ins_right = ins_ld + ins['me_match']['ME'].rjust(x2 - x1 + 1, "-") + ins_rd + "".center(ins_len - x2) if x2 > (ins_len - r_bp) else "".center(r_bp)
     ins_str = ins_left[0:l_bp] + "".center(14) + ins_right[-r_bp:]
     print(pos_str + " " + me_str + "  " + seq_before + "  " + ins_str)
-    # DEBUG
-    if ins['tsds']['before']['tsd'] != "":
-        print("TSD before=" + ins['tsds']['before']['tsd'])
     print()
 
     def coords2str(c):
