@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Initial version of MELT-RISC pipeline.
+# MELT-RISC: identify and classify mobile element insertions (MEIs) in PAV calls.
 
 import argparse
 import csv
@@ -34,8 +34,15 @@ ME_LENGTHS = {
 }
 
 # CSV output
-CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string']
+CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
+               'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs']
 CSV_FLANKING_SEQ_BP = 30
+
+# reverse complement
+NA_CHARS = "actgnACTGN"
+NA_COMP = "tgacnTGACN"
+NA_RE = re.compile('^[' + NA_CHARS + ']*$')
+NA_TRANS = str.maketrans(NA_CHARS, NA_COMP)
 
 # ------------------------------------------------------
 # logging
@@ -638,14 +645,83 @@ def check_insertion_for_polyA(vcf_ins, window_size_bp, max_mismatch_bp):
 #        fatal("polyA mismatch: " + str(vcf_ins['polyA']) + " - " + str(pa_e))
 #    if pt_e['x1'] != vcf_ins['polyT']['x1'] or pt_e['x2'] != vcf_ins['polyT']['x2']:
 #        fatal("polyT mismatch: " + str(vcf_ins['polyT']) + " - " + str(pt_e))
+
+
+# ------------------------------------------------------
+# write_me_fasta_fwd
+# ------------------------------------------------------
+def revcomp_na(seq):
+    if not re.match(NA_RE, seq):
+        fatal("NA sequence contains illegal character(s): " + seq)
+    revcomp = seq[::-1].translate(NA_TRANS)
+    return revcomp
+    
+# write ME sequence to FASTA file in forward orientation
+def write_me_fasta_fwd(ins, fasta_fh):
+    seqid = ins['chrom'] + ':' +  str(ins['pos']) + ':' + ins['me_match']['strand']
+    
+    # TODO - do we pass entire insertion seq or limit it to region that matches ref ME?
+    #  shouldn't be much difference if everything's working correctly
+    seq = ins['alt'][1:]
+
+    # revcomp sequence if needed
+    if ins['me_match']['strand'] == '-':
+        seq = revcomp_na(seq)
+
+    # write entry to FASTA
+    fasta_fh.write(">" + seqid + "\n")
+    fasta_fh.write(seq + "\n")
+    return seqid
+
+# ------------------------------------------------------
+# run_melt_calu_lineu
+# ------------------------------------------------------
+def run_melt_calu_lineu(MEIs_d, melt_jar, melt_exec, fasta_file_path):
+    if not re.match(r'^(CALU|LINEU)$', melt_exec):
+        fatal("Unsupported MELT executable - " + melt_exec)
+    melt_cmd = "java -jar " + melt_jar + " " + melt_exec + " -f " + fasta_file_path 
+    melt_fh = os.popen(melt_cmd)
+    reading = False
+    
+    for line in melt_fh:
+        if re.match(r'^Performing MELT analysis.*$', line):
+            reading = True
+        elif re.match('^End time.*$', line):
+            reading = False
+        elif reading == True:
+            m = re.match(r'^([^:]+:\d+:[\-\+])\t(\S+)\t(\S+)\t(\d+)\t(\d+)\t(\d+)\t(\d+)\t(\S+|No Differences)\t(\S+)$', line)
+            if not m:
+                fatal("unable to parse MELT output: " + line)
+            fasta_id = m.group(1)
+            family = m.group(2)
+            subfamily = m.group(3)
+            start = int(m.group(4))
+            stop =int(m.group(5))
+            diag_matches =int(m.group(6))
+            total_diffs =int(m.group(7))
+            diffs = m.group(8)
+            seq = m.group(9)
+
+            mei = MEIs_d[fasta_id]
+            if mei['fasta_id'] != fasta_id:
+                fatal("seqid mismatch for " + mei['fasta_id'] + " / " + fasta_id)
+
+            # TODO - cross-validate results with mei['alignment']?
+            mei['ME_family'] = family
+            mei['ME_subfamily'] = subfamily
+            mei['ME_start'] = str(start)
+            mei['ME_stop'] = str(stop)
+            mei['ME_num_diag_matches'] = str(diag_matches)
+            mei['ME_num_diffs'] = str(total_diffs)
+            mei['ME_diffs'] = diffs
     
 # ------------------------------------------------------
-# print_insertion()
+# add_insertion()
 # ------------------------------------------------------
 def ins_position_str(ins):
     return (ins['chrom'] + ":" + str(ins['pos'])).ljust(16)
 
-def print_insertion(ins, ref_seqs, csv_fh):
+def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
     ref_seq = ref_seqs[ins['chrom']]
     ref_seq_len = ref_seq['len']
     ref_seq_pos = ins['pos']
@@ -736,36 +812,43 @@ def print_insertion(ins, ref_seqs, csv_fh):
 
     def coords2str(c):
         return str(c['x1']) + '-' + str(c['x2'])
+
+    # ALU/LINE1 FASTA output
+    fasta_id = None
+    if (alu_fasta_fh is not None) and (ins['me_match']['ME'] == 'ALU'):
+        fasta_id = write_me_fasta_fwd(ins, alu_fasta_fh)
+
+    if (line_fasta_fh is not None) and (ins['me_match']['ME'] == 'LINE1'):
+        fasta_id = write_me_fasta_fwd(ins, line_fasta_fh)
+        
+    l_flank = get_l_context_bp(CSV_FLANKING_SEQ_BP)
+    r_flank = get_r_context_bp(CSV_FLANKING_SEQ_BP)
+    ins_d = {
+        'fasta_id': fasta_id,
+        'chrom': ins['chrom'],
+        'pos': str(ins['pos']),
+        'strand': ins['me_match']['strand'],
+        'ME': ins['me_match']['ME'],
+        '%ME': me_pctcov_str.strip(),
+        '%id': pctid_str.strip(),
+        '%id_ng': pctid_nogaps_str.strip(),
+        '%cov': rem_ins_pctcov_str.strip(),
+        'insertion_seq': ins['alt'][1:],
+        'left_flank_seq': l_flank,
+        'right_flank_seq': r_flank,
+        'TSD_seq': ins['tsds']['after']['tsd'],
+        'polyX_coords': coords2str(ins['polyX']),
+        'ME_coords': coords2str(ins['me_match']['alignment']['ME_coords']),
+        'insertion_coords': coords2str(ins['me_match']['alignment']['insertion_coords']),
+        'alignment': ins['me_match']['alignment']['match_str']
+    }
     
-    # CSV output
-    if csv_fh is not None:
-        # ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment']
-        l_flank = get_l_context_bp(CSV_FLANKING_SEQ_BP)
-        r_flank = get_r_context_bp(CSV_FLANKING_SEQ_BP)
-        csv_data = [ins['chrom'],
-                    str(ins['pos']),
-                    ins['me_match']['strand'],
-                    ins['me_match']['ME'],
-                    me_pctcov_str.strip(),
-                    pctid_str.strip(),
-                    pctid_nogaps_str.strip(),
-                    rem_ins_pctcov_str.strip(),
-                    ins['alt'][1:],
-                    l_flank,
-                    r_flank,
-                    ins['tsds']['after']['tsd'],
-                    coords2str(ins['polyX']),
-                    coords2str(ins['me_match']['alignment']['ME_coords']),
-                    coords2str(ins['me_match']['alignment']['insertion_coords']),
-                    ins['me_match']['alignment']['match_str']
-                    ]
-        csv_fh.write(",".join(csv_data) + "\n")
+    return ins_d
     
 # ------------------------------------------------------
 # main()
 # ------------------------------------------------------
 def main():
-
     # input
     parser = argparse.ArgumentParser(description='Check FASTA sequences against a set of VCF reference contigs.')
     parser.add_argument('--vcf', required=True, help='Path to VCF file containing contigs to check.')
@@ -785,6 +868,9 @@ def main():
     parser.add_argument('--seqid', required=False, help='Optional sequence id: process only insertions on this reference sequence.')
     parser.add_argument('--skip_seqids', required=False, help='Optional comma-delimited list of sequence ids to skip.')
     parser.add_argument('--csv_output', required=False, help='Optional path to CSV format output file.')
+    parser.add_argument('--alu_fasta', required=True, help='Path to FASTA output file of forward-strand ALU sequences.')
+    parser.add_argument('--line_fasta', required=True, help='Path to FASTA output file of forward-strand LINE1 sequences.')
+    parser.add_argument('--melt_jar', required=True, help='Path to MELT JAR file for running CALU and LINEU subfamily analysis.')
     args = parser.parse_args()
 
     skip_seqids = {}
@@ -830,16 +916,23 @@ def main():
     line_rev_aligns = read_water(args.line_water_rev)
     info("read " + str(len(line_rev_aligns)) + " reverse strand LINE1 alignment(s) from " + args.line_water_rev)
 
-    # CSV output
-    csv_fh = None
-    if args.csv_output is not None:
-        csv_fh = open(args.csv_output, "w")
-        if csv_fh is None:
-            fatal("failed to write CSV output to " + args.csv_output)
-        csv_fh.write(",".join(CSV_HEADERS) + "\n")
-            
-    print("Location        |ME   |+/-|%ME   |%id   |%id_ng|%cov  | insertion")
+    # FASTA output for CALU
+    alu_fasta_fh = open(args.alu_fasta, "w")
+    if alu_fasta_fh is None:
+        fatal("failed to open/write Alu FASTA file " + args.alu_fasta)
+    
+    # FASTA output for LINEU
+    line_fasta_fh = open(args.line_fasta, "w")
+    if line_fasta_fh is None:
+        fatal("failed to open/write LINE1 FASTA file " + args.line_fasta)
 
+    # MEIs to print/report
+    MEIs = []
+    MEIs_d = {}
+    
+    # stdout summary output
+    print("Location        |ME   |+/-|%ME   |%id   |%id_ng|%cov  | insertion")
+        
     n_tsd_before = 0
     n_tsd_after = 0
     n_me_match = 0
@@ -885,13 +978,44 @@ def main():
             if tsds['before']['len'] > tsds['after']['len']:
                 warn(ins_position_str(vcf_ins) + " longer TSD sequence found before insertion point")
 
-        # print insertions with ME match (but maybe no TSD)
+        # add insertions with ME match (but maybe no TSD)
         if me_match is not None:
-            print_insertion(vcf_ins, fasta_files, csv_fh)
+            ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta_fh, line_fasta_fh)
+            MEIs.append(ins_d)
+            if 'fasta_id' in ins_d:
+                MEIs_d[ins_d['fasta_id']] = ins_d
+                
+    # close output files
+    for fh in (alu_fasta_fh, line_fasta_fh):
+        if fh is not None:
+            fh.close()
 
-    if csv_fh is not None:
-        csv_fh.close()
-            
+    # run CALU, LINEU 
+    run_melt_calu_lineu(MEIs_d, args.melt_jar, 'CALU', args.alu_fasta)
+    run_melt_calu_lineu(MEIs_d, args.melt_jar, 'LINEU', args.line_fasta)
+    for mei in MEIs:
+        if 'ME_family' not in mei:
+            mei['ME_family'] = mei['ME']
+            mei['ME_subfamily'] = mei['ME']
+    
+    # CSV output
+    csv_fh = None
+    if args.csv_output is not None:
+        csv_fh = open(args.csv_output, "w")
+        if csv_fh is None:
+            fatal("failed to write CSV output to " + args.csv_output)
+        csv_fh.write(",".join(CSV_HEADERS) + "\n")
+    
+    # fields for CSV output
+    csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
+                  # MELT CALU/LINEU
+                  'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs'
+                  ]
+    
+    for mei in MEIs:
+        csv_fh.write(",".join([mei[f] if f in mei else '' for f in csv_fields]) + "\n")
+    csv_fh.close()
+        
     # summary
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
     info("found " + str(n_tsd_before) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _before_ the insertion point")

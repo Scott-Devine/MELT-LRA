@@ -11,13 +11,13 @@ const headers = [
 { text: 'chrom', value: 'chrom', sortable: true, fixed: true },
 { text: 'pos', value: 'pos', sortable: true, fixed: true },
 { text: 'strand', value: 'strand', sortable: true, fixed: true },
-{ text: 'ME', value: 'ME', sortable: true, fixed: true },
+{ text: 'ME_family', value: 'ME_family', sortable: true, fixed: true },
+{ text: 'ME_subfamily', value: 'ME_subfamily', sortable: true, fixed: true },
 { text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true },
 { text: '%ME', value: '%ME', sortable: true, fixed: true },
 { text: '%id', value: '%id', sortable: true, fixed: true },
 { text: '%id_nogaps', value: '%id_ng', sortable: true, fixed: true },
 { text: '%coverage', value: '%cov', sortable: true, fixed: true },
-{ text: 'TSD_seq', value: 'TSD_seq', sortable: true, fixed: true},
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
 { text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true},
 { text: 'MEI', value: 'MEI', fixed: true, width: 400 }
@@ -33,6 +33,8 @@ const currentPage = computed(() => dataTable.value?.currentPaginationNumber);
 
 const sortBy = []
 const sortType = []
+const me_types = ['ALU', 'LINE1', 'SVA']
+const me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
 
 const state = reactive({
     meis: [],
@@ -40,6 +42,7 @@ const state = reactive({
     selected_meis: [],
     selected_mei_counts: {'ALU': 0, 'LINE1':0, 'SVA': 0},
     selected_me_types: ['ALU', 'LINE1', 'SVA'],
+    selected_me_families: ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA'],
     headers: headers,
     pctid_range: [0.0, 100.0],
     min_pctid_nogaps: 90.0,
@@ -50,20 +53,33 @@ const state = reactive({
     polyx_length_range: [0.0, 500.0],
     display_mode: 'table'
 })
-const me_types = ['ALU', 'LINE1', 'SVA']
+
 function update_selected_meis() {
     gotoPage(1)
     let f_meis = []
-    let selected = {}
-    let n_selected = {}
-    
+
+    // selected by type
+    let selected_by_type = {}
+    let n_selected_by_type = {}
     me_types.forEach(mt => {
-        n_selected[mt] = 0
-        selected[mt] = false
+        n_selected_by_type[mt] = 0
+        selected_by_type[mt] = false
     })
     state.selected_me_types.forEach(mt =>{
-        selected[mt] = true
+        selected_by_type[mt] = true
     })
+
+    // selected by family
+    let selected_by_family = {}
+    let n_selected_by_family = {}
+    me_families.forEach(mf => {
+        n_selected_by_family[mf] = 0
+        selected_by_family[mf] = false
+    })
+    state.selected_me_families.forEach(mf =>{
+        selected_by_family[mf] = true
+    })
+
     state.meis.forEach(m => {
         if ((m['%id_ng'] >= state.min_pctid_nogaps) 
         && (m['%cov'] >= state.min_pctcov) 
@@ -72,15 +88,17 @@ function update_selected_meis() {
         && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
         && (m['TSD_length'] >= state.tsd_length_range[0]) && (m['TSD_length'] <= state.tsd_length_range[1])
         && (m['polyX_length'] >= state.polyx_length_range[0]) && (m['polyX_length'] <= state.polyx_length_range[1])
-        && (selected[m['ME']])
+        && (selected_by_type[m['ME']])
+        && (selected_by_family[m['ME_family']])
         ) {
             f_meis.push(m)
-            n_selected[m.ME]++
+            n_selected_by_type[m.ME]++
+            n_selected_by_family[m.ME_family]++
         }
     })
     state.selected_meis = f_meis
-    state.selected_mei_counts = n_selected
-    if (state.selected_meis.length == state.meis.length) state.total_mei_counts = n_selected
+    state.selected_mei_counts = n_selected_by_type
+    if (state.selected_meis.length == state.meis.length) state.total_mei_counts = n_selected_by_type
 }
 
 watch(() => state.min_pctid_nogaps, (newValue) => { update_selected_meis() })
@@ -92,9 +110,11 @@ watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.polyx_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.meis, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
-watch(() => state.show_alu, (newValue) => { console.log("show alu = " + state.show_alu) })
+watch(() => state.selected_me_families, (newValue) => { update_selected_meis() })
 
-const csv_headers = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string']
+const csv_headers = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
+            'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs']
+            
 function parse_mei(mei_str) {
     let f = mei_str.split(',')
     let nh = csv_headers.length
@@ -131,8 +151,8 @@ function getMEColor(me) {
 }
 
 // hard-coded data source
-//const mei_file = "../assets/data/chr22-MEs-90-90-95bp-v1.1.1.csv"
-const mei_file = "../assets/data/HG00514-CCS-PAV-MEs-90-90-95bp-v1.1.1.csv"
+//const mei_file = "../assets/data/chr22-MEs-v1.2.0-90-90-95bp.csv"
+const mei_file = "../assets/data/HG00514-CCS-PAV-MEs-v1.2.0-90-90-95bp.csv"
 const mei_url = new URL(mei_file, import.meta.url).href
 
 fetch(mei_url)
@@ -164,7 +184,7 @@ fetch(mei_url)
                     <v-row class="pa-0 ma-0">
                         <v-col cols="12" class="pa-0 ma-0">
                             <v-container class="pa-0 ma-0">
-                                <v-row class="pa-0 ma-0">
+                                <v-row v-if="false" class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         ME type(s):
                                     </v-col>
@@ -176,6 +196,18 @@ fetch(mei_url)
                                     </v-col>
                                 </v-row>
                                 
+                                <v-row class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0">
+                                        ME families:
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                        <v-select v-model="state.selected_me_families" :items="me_families" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
+                                    </v-col>
+                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                        
+                                    </v-col>
+                                </v-row>
+
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Insertion size range:
@@ -208,7 +240,7 @@ fetch(mei_url)
                                         <v-slider v-model="state.min_pctid_nogaps" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
                                     </v-col>
                                     <v-col cols="3" class="pa-0 ma-0 pl-3">
-                                        {{ state.min_pctid }}%
+                                        {{ state.min_pctid_nogaps }}%
                                     </v-col>
                                 </v-row>
                                 
@@ -308,6 +340,13 @@ fetch(mei_url)
                 <template #expand="item">
                     <div class="px-2">
                         <MEI :key="item.key" :mei="item" />
+                        <div class="text-h6">
+                            <div class="tsd_div pa-1 my-1 font-weight-bold">TSD</div> {{ item.TSD_seq }}<br>
+                            <span v-if="item.ME == 'ALU' || item.ME == 'LINE1'">
+                                <div class="calu_div pa-1 my-1 font-weight-bold">{{ item.ME == 'ALU' ? 'CALU' : 'LINEU'}}</div> 
+                                {{item.ME_family}} {{item.ME_subfamily}} {{item.ME_start}}-{{item.ME_stop}} diag_matches={{item.ME_num_diag_matches}} num_diffs={{ item.ME_num_diffs }}  diffs={{ item.ME_diffs }}<br>
+                            </span>
+                        </div>
                     </div>
                 </template>           
             </EasyDataTable>
@@ -331,4 +370,14 @@ fetch(mei_url)
 </template>
 
 <style scoped>
+div.tsd_div {
+    display: inline-block;
+    background-color: #a0ffa0;
+    border: 1px solid black;
+}
+div.calu_div {
+    display: inline-block;
+    background-color: #d0d0d0;
+    border: 1px solid black;
+}
 </style>
