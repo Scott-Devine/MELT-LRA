@@ -8,3 +8,10 @@ chr1:710579     |ALU  |+  |100.0%| 97.9%| 86.5%| atactgctat [AAAGAACTGCCCGGCCGGG
                                                              <---TSD---->                                                             <------------polyA------------>  <---TSD---->
                                                                          [ALU-----------------------------              ----------ALU>                               
 ```
+
+
+## Running the UI:
+
+$ cd ui
+$ npm run dev
+

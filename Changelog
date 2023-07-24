@@ -1,3 +1,6 @@
+v1.2.1 (July ?, 2023)
+ 
+
 v1.2.0 (June 2, 2023)
  -Use MELT CALU and LINEU to classify Alu and LINE elements, respectively. (#2)
  -Add ungapped percent identity to Vue3 viewer. (#15)
