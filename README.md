@@ -12,6 +12,7 @@ chr1:710579     |ALU  |+  |100.0%| 97.9%| 86.5%| atactgctat [AAAGAACTGCCCGGCCGGG
 
 ## Running the UI:
 
+```
 $ cd ui
 $ npm run dev
-
+```
