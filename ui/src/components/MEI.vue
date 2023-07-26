@@ -109,7 +109,7 @@
     return clr.formatRgb()
   }
 
-  // match string contains only ^ (gap in insertion), v (gap in ME), |, and .ß
+  // match string contains only ^ (gap in insertion), v (gap in ME), |, and .
   for(let i = 0;i < msl; ++i) {
     if (mei.match_string[i] == '^') {
       add_span()
@@ -137,7 +137,7 @@
 
   // convert spans to polygons
   const match_y1 = ins_axis_y + feat_y_offset + 6
-  const match_y2 = me_axis_y - feat_y_offset
+  const match_y2 = me_axis_y - feat_y_offset - 4
 
   spans.forEach(s => {
     s.points = []
@@ -148,9 +148,80 @@
     s.points_str = s.points.join(" ")
   })
 
+  // convert ME_diffs string to list of differences (with the reference)
+  // e.g. "d1-137|g211a|c236t|i252gcagtcc|c248g|a262g|a252g"
+  let diffs = []
+  const diffs_y1 = match_y2 + 6
+  const diffs_y2 = match_y2 + 16
+  const base_colors = { 'a': '#209af7', 'c': '#fa3c4c', 'g': '#58fa3c', 't': '#faed3c'}
+
+  mei.ME_diffs.split('|').forEach(d => {
+    let type = null
+    let start = null
+    let end = null
+    let seq_from = null
+    let seq_to = null
+    let color = null
+
+    // case 1: deletion
+    let m = d.match(/^d(\d+)(-(\d+))?$/)
+    if (m) {
+      type = 'd'
+      start = m[1] - 1
+      end = m[3] ? m[3] : m[1]
+      seq_from = null
+      seq_to = null
+    } 
+    else {
+      // case 2: insertion
+      m = d.match(/^i(\d+)([actg]+)$/)
+      if (m) {
+        type = 'i'
+        start = m[1]
+        end = m[1]
+        seq_from = ''
+        seq_to = m[2]
+      }
+      else {
+        // case 3: substitution (always single base?)
+        m = d.match(/^([actg])(\d+)([actg])$/)
+        if (m) {
+          type = 's'
+          start = m[2] - 1
+          end = m[2]
+          seq_from = m[1]
+          seq_to = m[3]
+          color = base_colors[seq_to]
+        } else if (d != "") {
+          console.log("unexpected reference diff = " + d)
+        }
+      }
+    }
+
+    if (type != null) {
+      let x_start = me_xscale(start)
+      let x_end = me_xscale(end)
+
+      let df = {
+        'type': type,
+        'start': start,
+        'end': end,
+        'seq_from': seq_from,
+        'seq_to': seq_to,
+        'x1': x_start <= x_end ? x_start : x_end,
+        'x2': x_start <= x_end ? x_end : x_start,
+        'y1': diffs_y1,
+        'y2': diffs_y2,
+        'color': color,
+        'text': d
+      }
+      diffs.push(df)
+    }
+  })
+
   const me_ref_str = ": " + mei['%ME'] + "% coverage at " + mei['%id_ng'] + "% identity"
 
-  // color key
+  // color key - percent identity
   const cb_height = 20
   const cb_width = 15
   const cb_y = height - margins.bottom - (cb_height * 5)
@@ -161,6 +232,15 @@
     { 'id': 70, 'color': pctid_color(70, 1), 'y': cb_y + cb_height * 3, 'height': cb_height },
     { 'id': 60, 'color': pctid_color(60, 1), 'y': cb_y + cb_height * 4, 'height': cb_height },
   ]
+
+  // color key - base substitutions
+  const base_color_key_blocks = [
+    { 'base': 'A', 'color': base_colors['a'], 'y': cb_y, height: cb_height },
+    { 'base': 'C', 'color': base_colors['c'], 'y': cb_y + cb_height, 'height': cb_height },
+    { 'base': 'G', 'color': base_colors['g'], 'y': cb_y + cb_height * 2, 'height': cb_height },
+    { 'base': 'T', 'color': base_colors['t'], 'y': cb_y + cb_height * 3, 'height': cb_height },
+    { 'base': 'del', 'color': '#202020', 'y': cb_y + cb_height * 4, 'height': cb_height },
+]
 
   const state = reactive({
     // SVG
@@ -211,8 +291,11 @@
     // alignment spans
     spans: spans,
     me_ref_str: me_ref_str,
-    // color key
-    color_key_blocks: color_key_blocks
+    // differences with reference
+    diffs: diffs,
+    // color keys
+    color_key_blocks: color_key_blocks,
+    base_color_key_blocks: base_color_key_blocks
   })
   
 </script>
@@ -228,9 +311,13 @@
       style="border: 1px solid white; background-color: black; color: rgba(235,235,235,0.64);"
       >
 
-      <!-- ad-hoc color key -->
+      <!-- ad-hoc color key / percent identity -->
       <rect v-for="ck in color_key_blocks" :x="10" :y="ck.y" :width="20" :height="ck.height" :fill="ck.color"></rect>
       <text v-for="ck in color_key_blocks" :x="35" :y="ck.y + ck.height -5" fill="#d0d0d0">{{ck.id + "%"}}</text>
+
+      <!-- color key for base substitutions -->
+      <rect v-for="ck in base_color_key_blocks" :x="width - 30" :y="ck.y" :width="20" :height="ck.height-2" :fill="ck.color" :stroke="ck.base == 'del' ? '#ffffff' : 'none'" stroke-dasharray="2,4,2,4"></rect>
+      <text v-for="ck in base_color_key_blocks" :x="width - 40" :y="ck.y + ck.height -5" fill="#d0d0d0" text-anchor="end">{{ck.base}}</text>
 
       <!-- insertion feature on ref genome -->
       <line :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.ins_len)" :y1="state.ins_y" :y2="state.ins_y" stroke-width="3" stroke="#ffffff" />
@@ -255,6 +342,12 @@
 
       <!-- match/alignment spans -->
       <polygon v-for="s in state.spans" :points="s.points_str" :fill="pctid_color(s.pct_id, 0.5)" :stroke="pctid_color(s.pct_id, 1.0)" stroke-width="2" />
+
+      <!-- diffs with reference -->
+      <!-- CALU/LINEU reference diffs - deletions -->
+      <rect v-for="d in state.diffs.filter(d => d.type == 'd')" :x="d.x1" :y="d.y1" :width="d.x2 - d.x1" :height="d.y2 - d.y1" fill="#202020" stroke="#ffffff" stroke-dasharray="2,4,2,4"></rect>
+      <!-- substitutions -->
+      <line v-for="d in state.diffs.filter(d => d.type == 's')" :x1="d.x1" :x2="d.x1" :y1="d.y1" :y2="d.y2" :stroke="d.color" stroke-width="2" />
 
       <!-- TSD, polyX in ME coords -->
       <line v-if="state.tsd_len > 0" :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.tsd_len)" :y1="state.ins_feat_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#8ccf9e"/>
