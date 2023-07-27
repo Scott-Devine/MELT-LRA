@@ -4,8 +4,9 @@
   import { color } from 'd3-color'
   import { interpolateYlOrRd } from 'd3-scale-chromatic'
   import { format } from 'd3-format'
-  import { scaleLinear, scaleLog } from 'd3-scale';
-  import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis';
+  import { scaleLinear, scaleLog } from 'd3-scale'
+  import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis'
+  import { findOrfs } from '../orfs.js'
   
   const props = defineProps({
     mei: { type: Object, required: true },
@@ -24,7 +25,7 @@
   
   // SVG coordinate system
   const width = 1200
-  const height = 250
+  const height = 270
   const margins = { left: 80, right: 75, top: 40, bottom: 20}
   let rx1 = margins.left
   let rx2 = width - margins.right
@@ -240,7 +241,17 @@
     { 'base': 'G', 'color': base_colors['g'], 'y': cb_y + cb_height * 2, 'height': cb_height },
     { 'base': 'T', 'color': base_colors['t'], 'y': cb_y + cb_height * 3, 'height': cb_height },
     { 'base': 'del', 'color': '#202020', 'y': cb_y + cb_height * 4, 'height': cb_height },
-]
+  ]
+
+  // L1s only - find ORFs
+  let orfs = []
+  if (mei.ME == 'LINE1') {
+    orfs = findOrfs(mei['insertion_seq'])
+    orfs.forEach(o => {
+      o.x1 = ins_xscale(o.start)
+      o.x2 = ins_xscale(o.end)
+    })
+  }
 
   const state = reactive({
     // SVG
@@ -293,6 +304,8 @@
     me_ref_str: me_ref_str,
     // differences with reference
     diffs: diffs,
+    // ORFs
+    orfs: orfs,
     // color keys
     color_key_blocks: color_key_blocks,
     base_color_key_blocks: base_color_key_blocks
@@ -319,6 +332,9 @@
       <rect v-for="ck in base_color_key_blocks" :x="width - 30" :y="ck.y" :width="20" :height="ck.height-2" :fill="ck.color" :stroke="ck.base == 'del' ? '#ffffff' : 'none'" stroke-dasharray="2,4,2,4"></rect>
       <text v-for="ck in base_color_key_blocks" :x="width - 40" :y="ck.y + ck.height -5" fill="#d0d0d0" text-anchor="end">{{ck.base}}</text>
 
+      <!-- ORFS -->
+      <text v-if="state.orfs.length > 0" :x="10" :y="120" font-weight="bold" fill="#f189f5" stroke="#f189f5" font-size="1rem">ORFs</text>
+
       <!-- insertion feature on ref genome -->
       <line :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.ins_len)" :y1="state.ins_y" :y2="state.ins_y" stroke-width="3" stroke="#ffffff" />
       <text class="ins_label" :x="state.ins_xscale(state.ins_len/2)" :y="state.ins_label_y" fill="#ffffff">{{ state.ins_len + " bp insertion [" + state.mei.strand + " strand]" }}</text>
@@ -343,11 +359,13 @@
       <!-- match/alignment spans -->
       <polygon v-for="s in state.spans" :points="s.points_str" :fill="pctid_color(s.pct_id, 0.5)" :stroke="pctid_color(s.pct_id, 1.0)" stroke-width="2" />
 
-      <!-- diffs with reference -->
       <!-- CALU/LINEU reference diffs - deletions -->
       <rect v-for="d in state.diffs.filter(d => d.type == 'd')" :x="d.x1" :y="d.y1" :width="d.x2 - d.x1" :height="d.y2 - d.y1" fill="#202020" stroke="#ffffff" stroke-dasharray="2,4,2,4"></rect>
-      <!-- substitutions -->
+      <!-- CALU/LINEU reference diffs - substitutions -->
       <line v-for="d in state.diffs.filter(d => d.type == 's')" :x1="d.x1" :x2="d.x1" :y1="d.y1" :y2="d.y2" :stroke="d.color" stroke-width="2" />
+
+      <!-- ORFS in insertion sequence -->
+      <rect v-for="o in state.orfs.filter(o => (o.len >= 100))" :x="o.x1" :y="state.ins_feat_y + 2 + (o.row * 6)" :width="o.x2 - o.x1" :height="4" fill="#f189f5" stroke="#f189f5"></rect>
 
       <!-- TSD, polyX in ME coords -->
       <line v-if="state.tsd_len > 0" :x1="state.ins_xscale(0)" :x2="state.ins_xscale(state.tsd_len)" :y1="state.ins_feat_y" :y2="state.ins_feat_y" stroke-width="4" stroke="#8ccf9e"/>

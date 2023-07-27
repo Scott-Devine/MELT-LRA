@@ -1,4 +1,5 @@
 v1.2.1 (July ?, 2023)
+ -Display ORFs for full-length L1s. (#17)
  -Show CALU/LINEU deletions and substitutions in viewer. (#18)
 
 v1.2.0 (June 2, 2023)
