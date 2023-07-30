@@ -34,12 +34,10 @@ function findForwardOrfs(seq) {
     frames.forEach(frame =>  {
         for (let p1 = frame;p1 < sl - 2; p1 += 3) {
             let codon = seq.substring(p1, p1+3)
-//            console.log("codon=" + codon)
             let end = null;
             if (codon.match(START_RE)) {
                 for (let p2 = p1 + 3;p2 < sl - 2; p2 += 3) {
                     let codon = seq.substring(p2, p2+3)
-//                    console.log("poss stop codon=" + codon)
                     if (codon.match(STOP_RE)) {
                         end = p2 + 2
                         break
