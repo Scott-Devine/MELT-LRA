@@ -8,6 +8,7 @@
   import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis'
   import { findOrfs } from '../orfs.js'
   import { getAlignmentSpans } from '../alignments.js'
+  import { getCALUDiffs } from '../calu_diffs.js'
   
   const props = defineProps({
     mei: { type: Object, required: true },
@@ -103,73 +104,20 @@
 
   // convert ME_diffs string to list of differences (with the reference)
   // e.g. "d1-137|g211a|c236t|i252gcagtcc|c248g|a262g|a252g"
-  let diffs = []
+  let diffs = getCALUDiffs(mei)
+  
   const diffs_y1 = match_y2 + 6
   const diffs_y2 = match_y2 + 16
   const base_colors = { 'a': '#209af7', 'c': '#fa3c4c', 'g': '#58fa3c', 't': '#faed3c'}
 
-  mei.ME_diffs.split('|').forEach(d => {
-    let type = null
-    let start = null
-    let end = null
-    let seq_from = null
-    let seq_to = null
-    let color = null
-
-    // case 1: deletion
-    let m = d.match(/^d(\d+)(-(\d+))?$/)
-    if (m) {
-      type = 'd'
-      start = m[1] - 1
-      end = m[3] ? m[3] : m[1]
-      seq_from = null
-      seq_to = null
-    } 
-    else {
-      // case 2: insertion
-      m = d.match(/^i(\d+)([actg]+)$/)
-      if (m) {
-        type = 'i'
-        start = m[1]
-        end = m[1]
-        seq_from = ''
-        seq_to = m[2]
-      }
-      else {
-        // case 3: substitution (always single base?)
-        m = d.match(/^([actg])(\d+)([actg])$/)
-        if (m) {
-          type = 's'
-          start = m[2] - 1
-          end = m[2]
-          seq_from = m[1]
-          seq_to = m[3]
-          color = base_colors[seq_to]
-        } else if (d != "") {
-          console.log("unexpected reference diff = " + d)
-        }
-      }
-    }
-
-    if (type != null) {
-      let x_start = me_xscale(start)
-      let x_end = me_xscale(end)
-
-      let df = {
-        'type': type,
-        'start': start,
-        'end': end,
-        'seq_from': seq_from,
-        'seq_to': seq_to,
-        'x1': x_start <= x_end ? x_start : x_end,
-        'x2': x_start <= x_end ? x_end : x_start,
-        'y1': diffs_y1,
-        'y2': diffs_y2,
-        'color': color,
-        'text': d
-      }
-      diffs.push(df)
-    }
+  diffs.forEach(d => { 
+    let x_start = me_xscale(d['start'])
+    let x_end = me_xscale(d['end'])          
+    d['y1'] = diffs_y1
+    d['y2'] = diffs_y2
+    d['x1'] = x_start <= x_end ? x_start : x_end
+    d['x2'] = x_start <= x_end ? x_end : x_start
+    if (d['type'] == 's') d['color'] = base_colors[d['seq_to']]
   })
 
   const me_ref_str = ": " + mei['%ME'] + "% coverage at " + mei['%id_ng'] + "% identity"
