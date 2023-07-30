@@ -7,6 +7,7 @@
   import { scaleLinear, scaleLog } from 'd3-scale'
   import { axisTop, axisBottom, axisLeft, axisRight } from 'd3-axis'
   import { findOrfs } from '../orfs.js'
+  import { getAlignmentSpans } from '../alignments.js'
   
   const props = defineProps({
     mei: { type: Object, required: true },
@@ -71,35 +72,6 @@
   const me_xaxis = axisBottom(me_xscale)
   const[me_x1, me_x2] = mei.ME_coords.split("-").map(x => x * 1.0)
 
-  // convert match string to alignment spans
-  let spans = [];
-  // offsets from left side of the alignment - will add ins_x1, me_x1 to these
-  let ins_o1 = 0
-  let ins_o2 = 0
-  let me_o1 = 0
-  let me_o2 = 0
-  let n_id_bp = 0
-  const msl = mei.match_string.length;
-
-  function add_span() {
-    if (((ins_o2 - ins_o1) != 0) && ((me_o2 - me_o1) != 0)) {
-      // handle reverse strand matches
-      let ins_c = null 
-      if (mei.strand == '+') {
-        ins_c = [ins_x1 + ins_o1 - 1, ins_x1 + ins_o2 - 1]
-      } else {
-        ins_c = [ins_x2 - ins_o1 - 1, ins_x2 - ins_o2 - 1]
-      }
-      const span = {
-        'ins': ins_c, 
-        'me': [me_x1 + me_o1 - 1, me_x1 + me_o2 - 1],
-        'pct_id': (n_id_bp / (ins_o2 - ins_o1)) * 100.0
-      }
-      spans.push(span)
-      n_id_bp = 0
-    }
-  }
-
   // set color based on percent identity
   const color_fn = interpolateYlOrRd;
   let col = null;
@@ -110,27 +82,6 @@
     return clr.formatRgb()
   }
 
-  // match string contains only ^ (gap in insertion), v (gap in ME), |, and .
-  for(let i = 0;i < msl; ++i) {
-    if (mei.match_string[i] == '^') {
-      add_span()
-      ins_o2 += 1
-      ins_o1 = ins_o2
-      me_o1 = me_o2
-    } else if (mei.match_string[i] == 'v') {
-      add_span()
-      me_o2 += 1
-      ins_o1 = ins_o2
-      me_o1 = me_o2
-    } else {
-      if (mei.match_string[i] == '|') n_id_bp += 1
-      // start or extend span
-      ins_o2 += 1
-      me_o2 += 1
-    }
-  }
-  add_span()
-
   const feat_y_offset = 6
   const lbl_y_offset = 22
   const ins_axis_y = margins.top + 50
@@ -140,6 +91,7 @@
   const match_y1 = ins_axis_y + feat_y_offset + 6
   const match_y2 = me_axis_y - feat_y_offset - 4
 
+  let spans = getAlignmentSpans(mei)
   spans.forEach(s => {
     s.points = []
     s.points.push([ins_xscale(s.ins[0]), match_y1])
