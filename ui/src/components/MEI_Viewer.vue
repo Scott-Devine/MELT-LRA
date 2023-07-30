@@ -5,6 +5,10 @@ import MEI from './MEI.vue'
 import MiniMEI from './MiniMEI.vue'
 import { format } from 'd3-format'
 
+const props = defineProps({
+    meis: Array
+});
+
 const pct_format = format(".1f")
 
 const headers = [
@@ -101,6 +105,7 @@ function update_selected_meis() {
     if (state.selected_meis.length == state.meis.length) state.total_mei_counts = n_selected_by_type
 }
 
+watch(() => props.meis, (newValue) => { state.meis = newValue })
 watch(() => state.min_pctid_nogaps, (newValue) => { update_selected_meis() })
 watch(() => state.pctid_range, (newValue) => { update_selected_meis() })
 watch(() => state.min_pctcov, (newValue) => { update_selected_meis() })
@@ -112,28 +117,6 @@ watch(() => state.meis, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_families, (newValue) => { update_selected_meis() })
 
-const csv_headers = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
-            'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs']
-            
-function parse_mei(mei_str) {
-    let f = mei_str.split(',')
-    let nh = csv_headers.length
-    let mei = {};
-    for (let i = 0;i < nh; ++i) {
-        if (f[i].endsWith('%')) {
-            f[i] = f[i].slice(0, -1) * 1.0
-        }
-        mei[csv_headers[i]] = f[i];
-    }
-    let pxc = mei['polyX_coords'].split('-')
-    
-    mei['pos'] = mei['pos'] * 1.0
-    mei['insertion_size'] = mei['insertion_seq'].length
-    mei['TSD_length'] = mei['TSD_seq'].length
-    mei['polyX_length'] = pxc[1] - pxc[0] >= 0 ? pxc[1] - pxc[0] : 0
-    mei['key'] = mei['chrom'] + ':' + mei['pos']
-    return mei
-}
 function formatRatio(n1,n2) {
     return String(n1).padStart(String(n2).length, " ") + "/" + n2 + " (" + pct_format((n1/n2) * 100.0) + "%)";
 }
@@ -150,27 +133,13 @@ function getMEColor(me) {
     return "#7570b3";
 }
 
-// hard-coded data source
-//const mei_file = "../assets/data/chr22-MEs-v1.2.0-90-90-95bp.csv"
-const mei_file = "../assets/data/HG00514-CCS-PAV-MEs-v1.2.0-90-90-95bp.csv"
-const mei_url = new URL(mei_file, import.meta.url).href
+state.meis = props.meis
 
-fetch(mei_url)
-.then(res => {
-    return res.text()
-}).then(txt => {
-    state.meis = txt.split("\n").slice(1).filter(l => !l.match(/^\s*$/)).map(ms => parse_mei(ms))
-})
-.catch(err => {
-    console.log("caught error " + err)
-})
 </script>
 
 <template>
-    <v-app-bar color="primary" :title="'MEI callset: ' + mei_url">
-    </v-app-bar>
-    <v-main class="px-0 mx-0">
-        <v-card variant="outlined" class="pa-2 ma-2">
+    <v-card>
+        <v-card variant="outlined" class="pa-0 ma-0">
             <v-card-title>
                 <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Filter MEIs:</span>
                 <v-chip label size="large" color="black" class="font-weight-medium ml-4">{{ formatRatio(state.selected_meis.length, state.meis.length) }}</v-chip> 
@@ -365,8 +334,7 @@ fetch(mei_url)
                 <MEI :mei="mei" :key="mei.key" :label="(m + 1) + '/' + state.selected_meis.length" />
             </div>
         </v-card>
-        
-    </v-main>
+    </v-card>
 </template>
 
 <style scoped>
