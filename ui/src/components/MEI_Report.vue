@@ -111,13 +111,14 @@ function update_meis() {
 }
 
 watch(() => props.meis, (newValue) => { 
-    state.meis = newValue })
-    watch(() => state.meis, (newValue) => { 
-        update_meis() })
+    state.meis = newValue 
+})
+watch(() => state.meis, (newValue) => { 
+    update_meis() 
+})
+state.meis = props.meis
         
-        state.meis = props.meis
-        
-    </script>
+</script>
     
     <template>
         <v-card>
