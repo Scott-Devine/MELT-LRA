@@ -49,7 +49,7 @@
 </script>
 
 <template>
-  <v-app class="pa-0 ma-0">
+  <v-app class="pa-0 ma-0 mr-3">
     <v-toolbar density="compact" color="primary" app>
       <v-app-bar-nav-icon></v-app-bar-nav-icon>
       <v-toolbar-title>MEI callset: {{ mei_url }}</v-toolbar-title>
