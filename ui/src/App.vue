@@ -46,24 +46,23 @@
     console.log("caught error " + err)
   })
 
-/*
-
-    </v-main>
-  </v-app>
-</template>
-*/
 </script>
 
 <template>
   <v-app class="pa-0 ma-0">
-    <v-toolbar density="compact" color="primary" :title="'MEI callset: ' + mei_url" app>
+    <v-toolbar density="compact" color="primary" app>
+      <v-app-bar-nav-icon></v-app-bar-nav-icon>
+      <v-toolbar-title>MEI callset: {{ mei_url }}</v-toolbar-title>
+      <template v-slot:extension>
+        <v-tabs v-model="state.tab">
+          <v-tab key="viewer" value="viewer">MEI Viewer</v-tab>
+          <v-tab key="report" value="report">MEI Summary</v-tab>
+        </v-tabs>
+      </template>
     </v-toolbar>
     <v-main class="pa-0 ma-0" color="white" app>
       <v-container fluid class="pa-0 ma-0">
-        <v-tabs v-model="state.tab">
-          <v-tab key="viewer" value="viewer">MEI Viewer</v-tab>
-          <v-tab key="report" value="report">MEI Report</v-tab>
-        </v-tabs>
+        
         <v-card-text>
           <v-window v-model="state.tab">
             <v-window-item key="viewer" value="viewer">
@@ -81,5 +80,8 @@
 
 
 <style scoped>
-
+.v-tab {
+  font-size: 1.1rem;
+  font-weight: bold !important;
+}
 </style>

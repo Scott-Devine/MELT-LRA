@@ -1,5 +1,3 @@
-
-
 export function getCALUDiffs(mei) {
     let diffs = []
     mei.ME_diffs.split('|').forEach(d => {
@@ -37,7 +35,7 @@ export function getCALUDiffs(mei) {
                     end = m[2]
                     seq_from = m[1]
                     seq_to = m[3]
-                } else if (d != "") {
+                } else if ((d != "") && (d != "No Differences")) {
                     console.log("unexpected reference diff = " + d)
                 }
             }

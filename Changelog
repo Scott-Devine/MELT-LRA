@@ -1,4 +1,5 @@
-v1.2.1 (July ?, 2023)
+v1.2.1 (July 31, 2023)
+ -Add "MEI Summary" tab with list of all CALU/LINEU subs not covered by a pipeline S-W alignment.
  -Display ORFs for full-length L1s. (#17)
  -Show CALU/LINEU deletions and substitutions in viewer. (#18)
 
