@@ -860,6 +860,7 @@ def main():
     parser.add_argument('--line_water', required=True, help='Path to LINE1 water alignment output file.')
     parser.add_argument('--line_water_rev', required=True, help='Path to LINE1 water reverse strand alignment output file.')
     parser.add_argument('--min_seqlen', required=False, type=int, default=100, help='Minimum insertion sequence length.')
+    parser.add_argument('--max_seqlen', required=False, type=int, default=50000, help='Maximum insertion sequence length.')
     parser.add_argument('--min_pctid', required=False, type=int, default=90, help='Minimum percent identity of alignment.')
     parser.add_argument('--min_pctid_nogaps', required=False, type=int, default=90, help='Minimum percent identity of alignment ignoring gaps.')
     parser.add_argument('--min_pctcov', required=False, type=int, default=85, help='Minimum percent coverage of alignment.')
@@ -897,8 +898,8 @@ def main():
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
     
     # filter by length
-    vcf_insertions = [i for i in vcf_insertions if i['len'] >= args.min_seqlen]
-    info("read " + str(len(vcf_insertions)) + " insertions of length >= " + str(args.min_seqlen))
+    vcf_insertions = [i for i in vcf_insertions if i['len'] >= args.min_seqlen and i['len'] <= args.max_seqlen]
+    info("read " + str(len(vcf_insertions)) + " insertions with length >= " + str(args.min_seqlen) + " and length <= " + str(args.max_seqlen))
 
     # read alignment files
     alu_aligns = read_water(args.alu_water)

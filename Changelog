@@ -1,3 +1,6 @@
+v1.2.2 (TBD 2023)
+ -Add --max_seqlen option to find_MEs.py
+
 v1.2.1 (August 1, 2023)
  -Add "MEI Summary" tab with list of all CALU/LINEU subs not covered by a pipeline S-W alignment.
  -Display ORFs for full-length L1s. (#17)
