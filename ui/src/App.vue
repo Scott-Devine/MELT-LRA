@@ -4,7 +4,7 @@
   import MEI_Report from './components/MEI_Report.vue'
 
   const csv_headers = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
-            'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs']
+            'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots']
 
   function parse_mei(mei_str) {
     let f = mei_str.split(',')
@@ -16,35 +16,59 @@
         }
         mei[csv_headers[i]] = f[i];
     }
-    let pxc = mei['polyX_coords'].split('-')
-    
+    // overlapping annotations/repeats
+    let annots = mei['overlapping_annots'].split(/\|/).filter(a => a != '')
+    mei['annots'] = annots
+    mei['n_overlapping_annots'] = annots.length
+
     mei['pos'] = mei['pos'] * 1.0
     mei['insertion_size'] = mei['insertion_seq'].length
     mei['TSD_length'] = mei['TSD_seq'].length
+
+    let pxc = mei['polyX_coords'].split('-')
     mei['polyX_length'] = pxc[1] - pxc[0] >= 0 ? pxc[1] - pxc[0] : 0
     mei['key'] = mei['chrom'] + ':' + mei['pos']
     return mei
   }
 
-  // hard-coded data source
-  //const mei_file = "../assets/data/chr22-MEs-v1.2.0-90-90-95bp.csv"
-  const mei_file = "assets/data/HG00514-CCS-PAV-MEs-v1.2.0-90-90-95bp.csv"
-  const mei_url = new URL(mei_file, import.meta.url).href
+  // hard-coded data sources
+  const mei_files = [
+    // HG00514 chrY only - DEBUG
+    "assets/data/HG00514-chr22-PAV-MEs-v1.3.0-90-90-95bp.csv",
+    // HG00514 all
+    "assets/data/HG00514-PAV-MEs-v1.3.0-90-90-95bp.csv",
+    // HG00514 all but chrY
+//    "assets/data/HG00514-CCS-PAV-MEs-v1.2.0-90-90-95bp.csv",
+    // 2023-08-23 5 new samples
+    "assets/data/HG00171-PAV-MEs-v1.3.0-90-90-95bp.csv",
+    "assets/data/HG00733-PAV-MEs-v1.3.0-90-90-95bp.csv",
+    "assets/data/HG02666-PAV-MEs-v1.3.0-90-90-95bp.csv",
+    "assets/data/HG02953-PAV-MEs-v1.3.0-90-90-95bp.csv",
+    "assets/data/NA21487-PAV-MEs-v1.3.0-90-90-95bp.csv"
+  ]
 
+  const mei_urls = mei_files.map(f => { return new URL(f, import.meta.url).href })
+    
   const state = reactive({
+    'mei_urls': mei_urls,
+    'selected_mei_url': null,
     'meis': [],
     'tab': "viewer"
   })
 
-  fetch(mei_url)
-  .then(res => {
-    return res.text()
-  }).then(txt => {
-    state.meis = txt.split("\n").slice(1).filter(l => !l.match(/^\s*$/)).map(ms => parse_mei(ms))
+  watch(() => state.selected_mei_url, (newValue) => {
+    fetch(newValue)
+    .then(res => {
+      return res.text()
+    }).then(txt => {
+      state.meis = txt.split("\n").slice(1).filter(l => !l.match(/^\s*$/)).map(ms => parse_mei(ms))
+    })
+    .catch(err => {
+      console.log("caught error " + err)
+    })
   })
-  .catch(err => {
-    console.log("caught error " + err)
-  })
+
+  state.selected_mei_url = mei_urls[0]
 
 </script>
 
@@ -52,7 +76,10 @@
   <v-app class="pa-0 ma-0 mr-3">
     <v-toolbar density="compact" color="primary" app>
       <v-app-bar-nav-icon></v-app-bar-nav-icon>
-      <v-toolbar-title>MEI callset: {{ mei_url }}</v-toolbar-title>
+      <v-toolbar-title>
+        MEI Callset: 
+        <v-menu><template v-slot:activator="{ props }"><v-chip size="large" v-bind="props">{{state.selected_mei_url}}</v-chip></template><v-list v-model="state.mei_list"><v-list-item v-for="(i, ind) in state.mei_urls" @click="state.selected_mei_url = i"><v-list-item-title>{{i}}</v-list-item-title></v-list-item></v-list></v-menu>
+      </v-toolbar-title>
       <template v-slot:extension>
         <v-tabs v-model="state.tab">
           <v-tab key="viewer" value="viewer">MEI Viewer</v-tab>

@@ -24,6 +24,7 @@ const headers = [
 { text: '%coverage', value: '%cov', sortable: true, fixed: true },
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
 { text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true},
+{ text: 'overlapping repeats', value: 'n_overlapping_annots', sortable: true, fixed: true},
 { text: 'MEI', value: 'MEI', fixed: true, width: 400 }
 ]
 
@@ -53,8 +54,9 @@ const state = reactive({
     min_pctcov: 90.0,
     me_pctcov_range: [0.0, 100.0],
     me_ins_length_range: [0.0, 7000.0],
-    tsd_length_range: [0.0, 500.0],
+    tsd_length_range: [0.0, 3000.0],
     polyx_length_range: [0.0, 500.0],
+    overlapping_repeats_range: [0.0, 10.0],
     display_mode: 'table'
 })
 
@@ -92,13 +94,14 @@ function update_selected_meis() {
         && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
         && (m['TSD_length'] >= state.tsd_length_range[0]) && (m['TSD_length'] <= state.tsd_length_range[1])
         && (m['polyX_length'] >= state.polyx_length_range[0]) && (m['polyX_length'] <= state.polyx_length_range[1])
+        && (m['n_overlapping_annots'] >= state.overlapping_repeats_range[0]) && (m['n_overlapping_annots'] <= state.overlapping_repeats_range[1])
         && (selected_by_type[m['ME']])
         && (selected_by_family[m['ME_family']])
         ) {
             f_meis.push(m)
             n_selected_by_type[m.ME]++
             n_selected_by_family[m.ME_family]++
-        }
+          }
     })
     state.selected_meis = f_meis
     state.selected_mei_counts = n_selected_by_type
@@ -113,6 +116,7 @@ watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
 watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.polyx_length_range, (newValue) => { update_selected_meis() })
+watch(() => state.overlapping_repeats_range, (newValue) => { update_selected_meis() })
 watch(() => state.meis, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_families, (newValue) => { update_selected_meis() })
@@ -242,7 +246,7 @@ state.meis = props.meis
                                         TSD length range:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
-                                        <v-range-slider v-model="state.tsd_length_range" :min="0" :max="500" :step="1" thumb-label hide-details></v-range-slider>
+                                        <v-range-slider v-model="state.tsd_length_range" :min="0" :max="3000" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
                                     <v-col cols="3" class="pa-0 ma-0 pl-3">
                                         {{ state.tsd_length_range[0] }}bp - {{ state.tsd_length_range[1] }}bp
@@ -261,6 +265,18 @@ state.meis = props.meis
                                     </v-col>
                                 </v-row>         
                                 
+                                <v-row class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0">
+                                        Overlapping hg38 repeats range:
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                        <v-range-slider v-model="state.overlapping_repeats_range" :min="0" :max="10" :step="1" thumb-label hide-details></v-range-slider>
+                                    </v-col>
+                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                        {{ state.overlapping_repeats_range[0] }} - {{ state.overlapping_repeats_range[1] }}
+                                    </v-col>
+                                </v-row>  
+
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Display:
@@ -315,6 +331,8 @@ state.meis = props.meis
                                 <div class="calu_div pa-1 my-1 font-weight-bold">{{ item.ME == 'ALU' ? 'CALU' : 'LINEU'}}</div> 
                                 {{item.ME_family}} {{item.ME_subfamily}} {{item.ME_start}}-{{item.ME_stop}} diag_matches={{item.ME_num_diag_matches}} num_diffs={{ item.ME_num_diffs }}  diffs={{ item.ME_diffs }}<br>
                             </span>
+                            <div v-if="item.overlapping_annots.length > 0" class="repeat_div pa-1 my-1 mr-2 font-weight-bold">overlapping hg38 repeats</div>
+                            <span v-for="(annot, anum) in item.overlapping_annots">{{ annot }}</span>
                         </div>
                     </div>
                 </template>           
@@ -346,6 +364,11 @@ div.tsd_div {
 div.calu_div {
     display: inline-block;
     background-color: #d0d0d0;
+    border: 1px solid black;
+}
+div.repeat_div {
+    display: inline-block;
+    background-color: #ffd0d0;
     border: 1px solid black;
 }
 </style>

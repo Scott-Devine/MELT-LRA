@@ -9,11 +9,12 @@ import hashlib
 import os
 import re
 import sys
+from ncls import NCLS
 
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -35,7 +36,7 @@ ME_LENGTHS = {
 
 # CSV output
 CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
-               'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs']
+               'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots']
 CSV_FLANKING_SEQ_BP = 30
 
 # reverse complement
@@ -191,7 +192,51 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
             })
             
     return insertions
-                
+
+# ------------------------------------------------------
+# read_ucsc_rmsk()
+# ------------------------------------------------------
+def read_ucsc_rmsk(ucsc_rmsk):
+    annots_by_chrom = {}
+    nr = 0
+    starts = []
+    ends = []
+    ids = []
+    
+    with gzip.open(ucsc_rmsk, 'rt') as fh:
+        cr = csv.reader(fh, delimiter='\t')
+        for row in cr:
+            (bin, swScore, milliDiv, milliDel, milliIns, genoName, genoStart, genoEnd, genoLeft, strand, repName, repClass, repFamily, repStart, repEnd, repLeft, id) = row
+            chrom = genoName
+            chromStart = genoStart
+            chromEnd = genoEnd
+            if chrom not in annots_by_chrom:
+                annots_by_chrom[chrom] = { 'starts': [], 'ends': [], 'n': 0, 'rows': [], 'ncl': None }
+            annots_by_chrom[chrom]['starts'].append(int(chromStart))
+            annots_by_chrom[chrom]['ends'].append(int(chromEnd))
+            annots_by_chrom[chrom]['n'] += 1
+            annots_by_chrom[chrom]['rows'].append(row)
+            nr += 1
+
+    info("read " + str(nr) + " repeat rows from " + ucsc_rmsk)
+
+    # create NCLs
+    for chrom in annots_by_chrom:
+        bc = annots_by_chrom[chrom]
+        bc['ncl'] = NCLS(bc['starts'], bc['ends'], range(0, bc['n']))
+
+    return annots_by_chrom
+        
+def get_overlapping_annotation(annots_by_chrom, chrom, start, end):
+    # not every contig has repeatmasker annotations in UCSC db
+    if chrom not in annots_by_chrom:
+        return []
+    by_chrom = annots_by_chrom[chrom]
+    annots = []
+    for j in by_chrom['ncl'].find_overlap(start, end):
+        annots.append(by_chrom['rows'][j[2]])
+    return annots
+
 # ------------------------------------------------------
 # read_water()
 # ------------------------------------------------------
@@ -872,6 +917,7 @@ def main():
     parser.add_argument('--alu_fasta', required=True, help='Path to FASTA output file of forward-strand ALU sequences.')
     parser.add_argument('--line_fasta', required=True, help='Path to FASTA output file of forward-strand LINE1 sequences.')
     parser.add_argument('--melt_jar', required=True, help='Path to MELT JAR file for running CALU and LINEU subfamily analysis.')
+    parser.add_argument('--ucsc_rmsk', required=False, help='Optional path to UCSC rmsk.txt.gz file containing repeat annotations.')
     args = parser.parse_args()
 
     skip_seqids = {}
@@ -884,7 +930,21 @@ def main():
     info("VERSION " + VERSION)
     for arg in vars(args):
         info(arg + "=" + str(getattr(args, arg)))
-            
+
+    # index UCSC annotation, if present
+    annots_by_chrom = None
+    if args.ucsc_rmsk:
+        annots_by_chrom = read_ucsc_rmsk(args.ucsc_rmsk)
+
+        # DEBUG
+#        info("chr1:33052507")
+#        chr1_ncl = annots_by_chrom['chr1'] 
+#        for j in chr1_ncl['ncl'].find_overlap(33052507,33052507):
+#            info(j, chr1_ncl['rows'][j[2]])
+
+#        annots = get_overlapping_annotation(annots_by_chrom, 'chr1', 33052507, 33052507)
+#        info("get_overlapping_annotation = " + str(annots))
+        
     # read reference FASTA files
     fasta_files = read_fasta_dir(args.fasta_dir, args.seqid, skip_seqids)
 
@@ -896,11 +956,11 @@ def main():
     # read VCF insertions
     vcf_insertions = read_vcf_insertions(args.vcf, fasta_files, args.seqid, skip_seqids)
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
-    
+
     # filter by length
     vcf_insertions = [i for i in vcf_insertions if i['len'] >= args.min_seqlen and i['len'] <= args.max_seqlen]
     info("read " + str(len(vcf_insertions)) + " insertions with length >= " + str(args.min_seqlen) + " and length <= " + str(args.max_seqlen))
-
+        
     # read alignment files
     alu_aligns = read_water(args.alu_water)
     info("read " + str(len(alu_aligns)) + " ALU alignment(s) from " + args.alu_water)
@@ -998,7 +1058,17 @@ def main():
         if 'ME_family' not in mei:
             mei['ME_family'] = mei['ME']
             mei['ME_subfamily'] = mei['ME']
-    
+
+    # check for overlapping annotation(s)
+    # TODO - check coordinates; UCSC uses 0-start, half-open. add one to start to get 1-start, closed coords
+    for mei in MEIs:
+        mei['overlapping_annots'] = ""
+        annots = get_overlapping_annotation(annots_by_chrom, mei['chrom'], int(mei['pos']), int(mei['pos']) + 1)
+        mei['overlapping_annots'] = "|".join([":".join([a[5], a[6], a[7], a[9], a[10], a[11], a[12], a[13]])  for a in annots])
+        if (len(annots) > 0):
+            sys.stderr.write("found " + str(len(annots)) + " overlapping annots for MEI " + mei['chrom'] + ":" + str(mei['pos']) + " - " + mei['overlapping_annots'] + "\n")
+            sys.stderr.flush()
+        
     # CSV output
     csv_fh = None
     if args.csv_output is not None:
@@ -1010,7 +1080,9 @@ def main():
     # fields for CSV output
     csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
                   # MELT CALU/LINEU
-                  'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs'
+                  'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs',
+                  # annotations
+                  'overlapping_annots'
                   ]
     
     for mei in MEIs:
