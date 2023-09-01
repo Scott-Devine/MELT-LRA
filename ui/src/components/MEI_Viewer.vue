@@ -60,6 +60,26 @@ const state = reactive({
     display_mode: 'table'
 })
 
+function reset_filters() {
+    state.selected_me_types = ['ALU', 'LINE1', 'SVA']
+    state.selected_me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
+    state.pctid_range[0] = 0.0
+    state.pctid_range[1] = 100.0
+    state.min_pctid_nogaps = 90.0
+    state.min_pctcov = 90.0
+    state.me_pctcov_range[0] = 0.0
+    state.me_pctcov_range[1] = 100.0
+    state.me_ins_length_range[0] = 0.0
+    state.me_ins_length_range[1] = 7000.0
+    state.tsd_length_range[0] = 0.0
+    state.tsd_length_range[1] = 3000.0
+    state.polyx_length_range[0] = 0.0
+    state.polyx_length_range[1] = 500.0
+    state.overlapping_repeats_range[0] = 0.0
+    state.overlapping_repeats_range[1] = 10.0
+    state.display_mode = 'table'
+}
+
 function update_selected_meis() {
     gotoPage(1)
     let f_meis = []
@@ -117,9 +137,12 @@ watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.polyx_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.overlapping_repeats_range, (newValue) => { update_selected_meis() })
-watch(() => state.meis, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_families, (newValue) => { update_selected_meis() })
+watch(() => state.meis, (newValue) => { 
+        reset_filters()
+        update_selected_meis()
+    })
 
 function formatRatio(n1,n2) {
     return String(n1).padStart(String(n2).length, " ") + "/" + n2 + " (" + pct_format((n1/n2) * 100.0) + "%)";
