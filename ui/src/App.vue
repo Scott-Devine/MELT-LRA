@@ -1,7 +1,7 @@
 <script setup>
   import { ref, computed, reactive, watch } from 'vue';
   import MEI_Viewer from './components/MEI_Viewer.vue'
-  import MEI_Report from './components/MEI_Report.vue'
+  import CALU_Report from './components/CALU_Report.vue'
 
   const csv_headers = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
             'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots']
@@ -83,7 +83,7 @@
       <template v-slot:extension>
         <v-tabs v-model="state.tab">
           <v-tab key="viewer" value="viewer">MEI Viewer</v-tab>
-          <v-tab key="report" value="report">MEI Summary</v-tab>
+          <v-tab key="report" value="report">CALU/LINEU</v-tab>
         </v-tabs>
       </template>
     </v-toolbar>
@@ -96,7 +96,7 @@
                <MEI_Viewer :meis="state.meis" />
             </v-window-item>
             <v-window-item key="report" value="report">
-               <MEI_Report :meis="state.meis"/>
+               <CALU_Report :meis="state.meis"/>
             </v-window-item>
           </v-window>
         </v-card-text>
