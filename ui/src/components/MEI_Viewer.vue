@@ -24,7 +24,8 @@ const headers = [
 { text: '%coverage', value: '%cov', sortable: true, fixed: true },
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
 { text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true},
-{ text: 'overlapping repeats', value: 'n_overlapping_annots', sortable: true, fixed: true},
+//{ text: 'overlapping repeats', value: 'n_overlapping_annots', sortable: true, fixed: true},
+{ text: 'overlapping repeat family', value: 'overlapping_rep_fam', sortable: true, fixed: true},
 { text: 'MEI', value: 'MEI', fixed: true, width: 400 }
 ]
 
@@ -43,11 +44,20 @@ const me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
 
 const state = reactive({
     meis: [],
-    total_mei_counts: {'ALU': 0, 'LINE1':0, 'SVA': 0},
     selected_meis: [],
-    selected_mei_counts: {'ALU': 0, 'LINE1':0, 'SVA': 0},
+    // ME counts by type
+    total_mei_counts: {},
+    selected_mei_counts: {},
     selected_me_types: ['ALU', 'LINE1', 'SVA'],
+    // ME counts by family
     selected_me_families: ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA'],
+    total_family_counts: {},
+    selected_family_counts: {},
+    // overlapping repeat families
+    overlapping_rep_fams: [],
+    selected_overlapping_rep_fams: [],
+    total_overlapping_rep_counts: {},
+    selected_overlapping_rep_counts: {},
     headers: headers,
     pctid_range: [0.0, 100.0],
     min_pctid_nogaps: 90.0,
@@ -83,7 +93,7 @@ function reset_filters() {
 function update_selected_meis() {
     gotoPage(1)
     let f_meis = []
-
+    
     // selected by type
     let selected_by_type = {}
     let n_selected_by_type = {}
@@ -94,7 +104,7 @@ function update_selected_meis() {
     state.selected_me_types.forEach(mt =>{
         selected_by_type[mt] = true
     })
-
+    
     // selected by family
     let selected_by_family = {}
     let n_selected_by_family = {}
@@ -105,7 +115,19 @@ function update_selected_meis() {
     state.selected_me_families.forEach(mf =>{
         selected_by_family[mf] = true
     })
-
+    
+    // selected by overlapping repeat family
+    let selected_by_ol_rep_fam = {}
+    let n_selected_by_ol_rep_fam = {}
+    
+    state.overlapping_rep_fams.forEach(rf => {
+        n_selected_by_ol_rep_fam[rf] = 0
+        selected_by_ol_rep_fam[rf] = false
+    })
+    state.selected_overlapping_rep_fams.forEach(rf => {
+        selected_by_ol_rep_fam[rf] = true 
+    })
+    
     state.meis.forEach(m => {
         if ((m['%id_ng'] >= state.min_pctid_nogaps) 
         && (m['%cov'] >= state.min_pctcov) 
@@ -117,15 +139,43 @@ function update_selected_meis() {
         && (m['n_overlapping_annots'] >= state.overlapping_repeats_range[0]) && (m['n_overlapping_annots'] <= state.overlapping_repeats_range[1])
         && (selected_by_type[m['ME']])
         && (selected_by_family[m['ME_family']])
-        ) {
+        && (selected_by_ol_rep_fam[m['overlapping_rep_fam']]))
+        {
             f_meis.push(m)
             n_selected_by_type[m.ME]++
             n_selected_by_family[m.ME_family]++
-          }
+            n_selected_by_ol_rep_fam[m.overlapping_rep_fam]++
+        }
     })
     state.selected_meis = f_meis
     state.selected_mei_counts = n_selected_by_type
-    if (state.selected_meis.length == state.meis.length) state.total_mei_counts = n_selected_by_type
+    state.selected_family_counts = n_selected_by_family
+    state.selected_overlapping_rep_counts = n_selected_by_ol_rep_fam
+}
+
+function load_new_data() {
+    // recompute global counts, get list of overlapping hg38 repeats
+    let me_type_counts = {}
+    let me_family_counts = {}
+    let ol_rep_counts = {}
+    
+    state.meis.forEach(m => {
+        if (!(m.ME in me_type_counts)) me_type_counts[m.ME] = 0
+        me_type_counts[m.ME] += 1
+        if (!(m.ME_family in me_family_counts)) me_family_counts[m.ME_family] = 0
+        me_family_counts[m.ME_family] += 1
+        if (!(m.overlapping_rep_fam in ol_rep_counts)) ol_rep_counts[m.overlapping_rep_fam] = 0
+        ol_rep_counts[m.overlapping_rep_fam] += 1
+    })
+    
+    state.total_mei_counts = me_type_counts
+    state.total_family_counts = me_family_counts
+    state.overlapping_rep_fams = Object.keys(ol_rep_counts).sort()
+    state.selected_overlapping_rep_fams = Object.keys(ol_rep_counts).sort()
+    state.total_overlapping_rep_counts = ol_rep_counts
+
+    reset_filters()
+    update_selected_meis()
 }
 
 watch(() => props.meis, (newValue) => { state.meis = newValue })
@@ -139,10 +189,8 @@ watch(() => state.polyx_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.overlapping_repeats_range, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_families, (newValue) => { update_selected_meis() })
-watch(() => state.meis, (newValue) => { 
-        reset_filters()
-        update_selected_meis()
-    })
+watch(() => state.selected_overlapping_rep_fams, (newValue) => { update_selected_meis() })
+watch(() => state.meis, (newValue) => { load_new_data() })
 
 function formatRatio(n1,n2) {
     return String(n1).padStart(String(n2).length, " ") + "/" + n2 + " (" + pct_format((n1/n2) * 100.0) + "%)";
@@ -158,6 +206,20 @@ function getMEColor(me) {
     if (me == 'ALU') return "#1b9e77"
     if (me == 'LINE1') return "#d95f02"
     return "#7570b3";
+}
+
+function selectAllMeiFams() {
+    state.selected_me_families = me_families;
+}
+function deselectAllMeiFams() {
+    state.selected_me_families = [];
+}
+
+function selectAllOverlappingRepFams() {
+    state.selected_overlapping_rep_fams = state.overlapping_rep_fams;
+}
+function deselectAllOverlappingRepFams() {
+    state.selected_overlapping_rep_fams = [];
 }
 
 state.meis = props.meis
@@ -185,7 +247,7 @@ state.meis = props.meis
                                         ME type(s):
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
-                                        <v-select v-model="state.selected_me_types" :items="['ALU', 'LINE1', 'SVA']" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
+                                        <v-select v-model="state.selected_me_types" :items="['ALU', 'LINE1', 'SVA']" multiple hide-details clearable variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
                                     </v-col>
                                     <v-col cols="3" class="pa-0 ma-0 pl-3">
                                         
@@ -197,13 +259,22 @@ state.meis = props.meis
                                         ME families:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
-                                        <v-select v-model="state.selected_me_families" :items="me_families" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
+                                        <v-select v-model="state.selected_me_families" :items="me_families" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
+                                            <template v-slot:prepend-item>
+                                                <v-list-item title="Deselect All" @click="deselectAllMeiFams"></v-list-item>
+                                                <v-list-item title="Select All" @click="selectAllMeiFams"></v-list-item>
+                                                <v-divider class="mt-2"></v-divider>
+                                            </template>
+                                            <template v-slot:selection="data">
+                                                {{ data.item.value }} [{{ state.selected_family_counts[data.item.value ]}}/{{ state.total_family_counts[data.item.value] }}]
+                                            </template>
+                                        </v-select>
                                     </v-col>
                                     <v-col cols="3" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
-
+                                
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Insertion size range:
@@ -227,7 +298,7 @@ state.meis = props.meis
                                         {{ state.pctid_range[0] }}% - {{ state.pctid_range[1] }}%
                                     </v-col>
                                 </v-row>
-
+                                
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Min ungapped %identity:
@@ -251,7 +322,7 @@ state.meis = props.meis
                                         {{ state.min_pctcov }}%
                                     </v-col>
                                 </v-row>
-
+                                
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Reference ME %coverage range:
@@ -290,7 +361,7 @@ state.meis = props.meis
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
-                                        Overlapping hg38 repeats range:
+                                        Number of overlapping hg38 repeats:
                                     </v-col>
                                     <v-col cols="6" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.overlapping_repeats_range" :min="0" :max="10" :step="1" thumb-label hide-details></v-range-slider>
@@ -299,7 +370,28 @@ state.meis = props.meis
                                         {{ state.overlapping_repeats_range[0] }} - {{ state.overlapping_repeats_range[1] }}
                                     </v-col>
                                 </v-row>  
-
+                                
+                                <v-row class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0">
+                                        Overlapping hg38 repeat family:
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                        <v-select v-model="state.selected_overlapping_rep_fams" :items="state.overlapping_rep_fams" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
+                                            <template v-slot:prepend-item>
+                                                <v-list-item title="Deselect All" @click="deselectAllOverlappingRepFams"></v-list-item>
+                                                <v-list-item title="Select All" @click="selectAllOverlappingRepFams"></v-list-item>
+                                                <v-divider class="mt-2"></v-divider>
+                                            </template>
+                                            <template v-slot:selection="data">
+                                                {{ data.item.value }} [{{ state.selected_overlapping_rep_counts[data.item.value ]}}/{{ state.total_overlapping_rep_counts[data.item.value] }}]
+                                            </template>
+                                        </v-select>
+                                    </v-col>
+                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                        
+                                    </v-col>
+                                </v-row>
+                                
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Display:

@@ -21,6 +21,15 @@
     mei['annots'] = annots
     mei['n_overlapping_annots'] = annots.length
 
+    // unique overlapping repeat family/families
+    let overlapping_rep_fams = {}
+    annots.map(a => { 
+        let fam = a.split(/:/)[6]
+        overlapping_rep_fams[fam]++
+    })
+    mei['overlapping_rep_fam'] = Object.keys(overlapping_rep_fams).sort().join(",")
+    if (mei['overlapping_rep_fam'] == "") mei['overlapping_rep_fam'] = 'None'
+
     mei['pos'] = mei['pos'] * 1.0
     mei['insertion_size'] = mei['insertion_seq'].length
     mei['TSD_length'] = mei['TSD_seq'].length
