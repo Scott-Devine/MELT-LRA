@@ -36,7 +36,7 @@ ME_LENGTHS = {
 
 # CSV output
 CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
-               'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots']
+               'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots', 'genotype', 'hap1_region', 'hap2_region']
 CSV_FLANKING_SEQ_BP = 30
 
 # reverse complement
@@ -143,6 +143,7 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
     with gzip.open(vpath, 'rt') as fh:
         cr = csv.reader(fh, delimiter='\t')
         for row in cr:
+            lnum += 1
             if re.match(r'^#', row[0]):
                 continue
             
@@ -175,8 +176,8 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
             ref_base = refseq['seq'][pos-1]
             if ref_base.upper() != ref:
                 fatal("reference file base at " + str(pos) + " (" + ref_base  + ") != REF (" + ref + ")")
-                
-            insertions.append({
+
+            insertion = {
                 'chrom': chrom,
                 'pos': pos,
                 'vcf_id': vcf_id,
@@ -188,8 +189,32 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
                 'filt': filt,
                 'info': info,
                 'fmt': fmt,
-                'gt': gt
-            })
+                'gt': gt,
+            }
+
+            # assign hap regions to hap1/hap2 based on genotype - for homozygous hap1 should come first
+            gtypes = gt.split('|')
+            hap_nums = []
+            hap_num = 1
+            for gtype in gtypes:
+                if gtype == '1':
+                    hap_nums.append(hap_num)
+                hap_num += 1
+                    
+            # hap1_region, hap2_region
+            hap_nums_ind = 0
+            tig_region = inf_d['TIG_REGION']
+            regions = tig_region.split(',')
+            for region in regions: 
+               m = re.match(r'^([^:]+:\d+-\d+)$', region)
+               if m:
+                   hap_region = m.group(1)
+                   insertion["hap" + str(hap_nums[hap_nums_ind]) + "_region"] = hap_region
+                   hap_nums_ind += 1
+               else:
+                   fatal("unable to parse TIG_REGION " + region + " at line " + str(lnum))
+
+            insertions.append(insertion)
             
     return insertions
 
@@ -885,7 +910,10 @@ def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
         'polyX_coords': coords2str(ins['polyX']),
         'ME_coords': coords2str(ins['me_match']['alignment']['ME_coords']),
         'insertion_coords': coords2str(ins['me_match']['alignment']['insertion_coords']),
-        'alignment': ins['me_match']['alignment']['match_str']
+        'alignment': ins['me_match']['alignment']['match_str'],
+        'genotype': ins['gt'],
+        'hap1_region': ins['hap1_region'] if 'hap1_region' in ins else '',
+        'hap2_region': ins['hap2_region'] if 'hap2_region' in ins else ''
     }
     
     return ins_d
@@ -1065,9 +1093,9 @@ def main():
         mei['overlapping_annots'] = ""
         annots = get_overlapping_annotation(annots_by_chrom, mei['chrom'], int(mei['pos']), int(mei['pos']) + 1)
         mei['overlapping_annots'] = "|".join([":".join([a[5], a[6], a[7], a[9], a[10], a[11], a[12], a[13]])  for a in annots])
-        if (len(annots) > 0):
-            sys.stderr.write("found " + str(len(annots)) + " overlapping annots for MEI " + mei['chrom'] + ":" + str(mei['pos']) + " - " + mei['overlapping_annots'] + "\n")
-            sys.stderr.flush()
+#        if (len(annots) > 0):
+#            sys.stderr.write("found " + str(len(annots)) + " overlapping annots for MEI " + mei['chrom'] + ":" + str(mei['pos']) + " - " + mei['overlapping_annots'] + "\n")
+#            sys.stderr.flush()
         
     # CSV output
     csv_fh = None
@@ -1082,7 +1110,10 @@ def main():
                   # MELT CALU/LINEU
                   'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs',
                   # annotations
-                  'overlapping_annots'
+                  'overlapping_annots',
+                  # VCF genotype and haplotype info
+                  'genotype',
+                  'hap1_region', 'hap2_region'
                   ]
     
     for mei in MEIs:

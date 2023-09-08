@@ -1,4 +1,5 @@
 v1.3.0 (?? 2023)
+ -Add genotype and TIG_REGIONs to v1.3.0 CSV and UI. (#21)
  -Update UI to display and filter on overlapping hg38 repeat annotations. (#4, #16)
  -Add --ucsc_rmsk option to find_MEs.py (#4, #16)
  -Add --max_seqlen option to find_MEs.py

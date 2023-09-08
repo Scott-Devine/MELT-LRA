@@ -15,6 +15,7 @@ const headers = [
 { text: 'chrom', value: 'chrom', sortable: true, fixed: true },
 { text: 'pos', value: 'pos', sortable: true, fixed: true },
 { text: 'strand', value: 'strand', sortable: true, fixed: true },
+//{ text: 'genotype', value: 'genotype', sortable: true, fixed: true },
 { text: 'ME_family', value: 'ME_family', sortable: true, fixed: true },
 { text: 'ME_subfamily', value: 'ME_subfamily', sortable: true, fixed: true },
 { text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true },
@@ -41,6 +42,7 @@ const sortBy = []
 const sortType = []
 const me_types = ['ALU', 'LINE1', 'SVA']
 const me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
+const genotypes = ['1|1','1|0','0|1','1|.','.|1']
 
 const state = reactive({
     meis: [],
@@ -48,11 +50,15 @@ const state = reactive({
     // ME counts by type
     total_mei_counts: {},
     selected_mei_counts: {},
-    selected_me_types: ['ALU', 'LINE1', 'SVA'],
+    selected_me_types: me_types,
     // ME counts by family
-    selected_me_families: ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA'],
+    selected_me_families: me_families,
     total_family_counts: {},
     selected_family_counts: {},
+    // genotypes
+    selected_genotypes: genotypes,
+    total_genotype_counts: {},
+    selected_genotype_counts: {},
     // overlapping repeat families
     overlapping_rep_fams: [],
     selected_overlapping_rep_fams: [],
@@ -71,8 +77,9 @@ const state = reactive({
 })
 
 function reset_filters() {
-    state.selected_me_types = ['ALU', 'LINE1', 'SVA']
-    state.selected_me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
+    state.selected_me_types = me_types
+    state.selected_me_families = me_families
+    state.selected_genotypes = genotypes
     state.pctid_range[0] = 0.0
     state.pctid_range[1] = 100.0
     state.min_pctid_nogaps = 90.0
@@ -128,6 +135,18 @@ function update_selected_meis() {
         selected_by_ol_rep_fam[rf] = true 
     })
     
+    // selected by genotype
+    let selected_by_genotype = {}
+    let n_selected_by_genotype = {}
+
+    genotypes.forEach(g => {
+        n_selected_by_genotype[g] = 0
+        selected_by_genotype[g] = false
+    })
+    state.selected_genotypes.forEach(g => {
+        selected_by_genotype[g] = true
+    })
+
     state.meis.forEach(m => {
         if ((m['%id_ng'] >= state.min_pctid_nogaps) 
         && (m['%cov'] >= state.min_pctcov) 
@@ -139,18 +158,21 @@ function update_selected_meis() {
         && (m['n_overlapping_annots'] >= state.overlapping_repeats_range[0]) && (m['n_overlapping_annots'] <= state.overlapping_repeats_range[1])
         && (selected_by_type[m['ME']])
         && (selected_by_family[m['ME_family']])
-        && (selected_by_ol_rep_fam[m['overlapping_rep_fam']]))
+        && (selected_by_ol_rep_fam[m['overlapping_rep_fam']])
+        && (selected_by_genotype[m['genotype']]))
         {
             f_meis.push(m)
             n_selected_by_type[m.ME]++
             n_selected_by_family[m.ME_family]++
             n_selected_by_ol_rep_fam[m.overlapping_rep_fam]++
+            n_selected_by_genotype[m.genotype]++
         }
     })
     state.selected_meis = f_meis
     state.selected_mei_counts = n_selected_by_type
     state.selected_family_counts = n_selected_by_family
     state.selected_overlapping_rep_counts = n_selected_by_ol_rep_fam
+    state.selected_genotype_counts = n_selected_by_genotype
 }
 
 function load_new_data() {
@@ -158,6 +180,7 @@ function load_new_data() {
     let me_type_counts = {}
     let me_family_counts = {}
     let ol_rep_counts = {}
+    let genotype_counts = {}
     
     state.meis.forEach(m => {
         if (!(m.ME in me_type_counts)) me_type_counts[m.ME] = 0
@@ -166,6 +189,8 @@ function load_new_data() {
         me_family_counts[m.ME_family] += 1
         if (!(m.overlapping_rep_fam in ol_rep_counts)) ol_rep_counts[m.overlapping_rep_fam] = 0
         ol_rep_counts[m.overlapping_rep_fam] += 1
+        if (!(m.genotype in genotype_counts)) genotype_counts[m.genotype] = 0
+        genotype_counts[m.genotype] += 1
     })
     
     state.total_mei_counts = me_type_counts
@@ -173,6 +198,7 @@ function load_new_data() {
     state.overlapping_rep_fams = Object.keys(ol_rep_counts).sort()
     state.selected_overlapping_rep_fams = Object.keys(ol_rep_counts).sort()
     state.total_overlapping_rep_counts = ol_rep_counts
+    state.total_genotype_counts = genotype_counts
 
     reset_filters()
     update_selected_meis()
@@ -190,6 +216,7 @@ watch(() => state.overlapping_repeats_range, (newValue) => { update_selected_mei
 watch(() => state.selected_me_types, (newValue) => { update_selected_meis() })
 watch(() => state.selected_me_families, (newValue) => { update_selected_meis() })
 watch(() => state.selected_overlapping_rep_fams, (newValue) => { update_selected_meis() })
+watch(() => state.selected_genotypes, (newValue) => { update_selected_meis() })
 watch(() => state.meis, (newValue) => { load_new_data() })
 
 function formatRatio(n1,n2) {
@@ -205,23 +232,29 @@ function getCountRatio(m) {
 function getMEColor(me) {
     if (me == 'ALU') return "#1b9e77"
     if (me == 'LINE1') return "#d95f02"
-    return "#7570b3";
+    return "#7570b3"
 }
 
 function selectAllMeiFams() {
     state.selected_me_families = me_families;
 }
 function deselectAllMeiFams() {
-    state.selected_me_families = [];
+    state.selected_me_families = []
 }
 
 function selectAllOverlappingRepFams() {
     state.selected_overlapping_rep_fams = state.overlapping_rep_fams;
 }
 function deselectAllOverlappingRepFams() {
-    state.selected_overlapping_rep_fams = [];
+    state.selected_overlapping_rep_fams = []
 }
 
+function selectAllGenotypes() {
+    state.selected_genotypes = genotypes
+}
+function deselectAllGenotypes() {
+    state.selected_genotypes = []
+}
 state.meis = props.meis
 
 </script>
@@ -275,6 +308,27 @@ state.meis = props.meis
                                     </v-col>
                                 </v-row>
                                 
+                                <v-row class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0">
+                                        PAV genotypes:
+                                    </v-col>
+                                    <v-col cols="6" class="pa-0 ma-0">
+                                        <v-select v-model="state.selected_genotypes" :items="genotypes" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
+                                            <template v-slot:prepend-item>
+                                                <v-list-item title="Deselect All" @click="deselectAllGenotypes"></v-list-item>
+                                                <v-list-item title="Select All" @click="selectAllGenotypes"></v-list-item>
+                                                <v-divider class="mt-2"></v-divider>
+                                            </template>
+                                            <template v-slot:selection="data">
+                                                <span class="pr-1">{{ data.item.value }} [{{ state.selected_genotype_counts[data.item.value ]}}/{{ state.total_genotype_counts[data.item.value] }}]</span>
+                                            </template>
+                                        </v-select>
+                                    </v-col>
+                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                        
+                                    </v-col>
+                                </v-row>
+
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0">
                                         Insertion size range:
@@ -446,8 +500,15 @@ state.meis = props.meis
                                 <div class="calu_div pa-1 my-1 font-weight-bold">{{ item.ME == 'ALU' ? 'CALU' : 'LINEU'}}</div> 
                                 {{item.ME_family}} {{item.ME_subfamily}} {{item.ME_start}}-{{item.ME_stop}} diag_matches={{item.ME_num_diag_matches}} num_diffs={{ item.ME_num_diffs }}  diffs={{ item.ME_diffs }}<br>
                             </span>
-                            <div v-if="item.overlapping_annots.length > 0" class="repeat_div pa-1 my-1 mr-2 font-weight-bold">overlapping hg38 repeats</div>
-                            <span v-for="(annot, anum) in item.overlapping_annots">{{ annot }}</span>
+                            <div v-if="item.overlapping_annots.length">
+                                <div v-if="item.overlapping_annots.length > 0" class="repeat_div pa-1 my-1 mr-2 font-weight-bold">overlapping hg38 repeats</div>
+                                <span v-for="(annot, anum) in item.overlapping_annots">{{ annot }}</span>
+                                <br>
+                            </div>
+                            <div class="hap_div pa-1 my-1 font-weight-bold">genotype</div> {{ item.genotype }}<br>
+                            <div class="hap1_div pa-1 my-1 font-weight-bold">haplotype region 1</div> {{ item.hap1_region }}<br>
+                            <div class="hap2_div pa-1 my-1 font-weight-bold">haplotype region 2</div> {{ item.hap2_region }}<br>
+
                         </div>
                     </div>
                 </template>           
@@ -484,6 +545,21 @@ div.calu_div {
 div.repeat_div {
     display: inline-block;
     background-color: #ffd0d0;
+    border: 1px solid black;
+}
+div.hap_div {
+    display: inline-block;
+    background-color: #9090ff;
+    border: 1px solid black;
+}
+div.hap1_div {
+    display: inline-block;
+    background-color: #d0d0ff;
+    border: 1px solid black;
+}
+div.hap2_div {
+    display: inline-block;
+    background-color: #d0ffff;
     border: 1px solid black;
 }
 </style>
