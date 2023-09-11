@@ -12,19 +12,19 @@ const props = defineProps({
 const pct_format = format(".1f")
 
 const headers = [
-{ text: 'chrom', value: 'chrom', sortable: true, fixed: true },
-{ text: 'pos', value: 'pos', sortable: true, fixed: true },
-{ text: 'strand', value: 'strand', sortable: true, fixed: true },
+{ text: 'chrom', value: 'chrom', sortable: true, fixed: true, width: 80 },
+{ text: 'pos', value: 'pos', sortable: true, fixed: true, width: 100 },
+{ text: 'strand', value: 'strand', sortable: true, fixed: true, width: 80 },
 //{ text: 'genotype', value: 'genotype', sortable: true, fixed: true },
-{ text: 'ME_family', value: 'ME_family', sortable: true, fixed: true },
-{ text: 'ME_subfamily', value: 'ME_subfamily', sortable: true, fixed: true },
-{ text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true },
-{ text: '%ME', value: '%ME', sortable: true, fixed: true },
-{ text: '%id', value: '%id', sortable: true, fixed: true },
-{ text: '%id_nogaps', value: '%id_ng', sortable: true, fixed: true },
-{ text: '%coverage', value: '%cov', sortable: true, fixed: true },
-{ text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true},
-{ text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true},
+{ text: 'ME_family', value: 'ME_family', sortable: true, fixed: true, width: 80 },
+{ text: 'ME_subfamily', value: 'ME_subfamily', sortable: true, fixed: true, width: 100 },
+{ text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true, width: 80 },
+{ text: '%ME', value: '%ME', sortable: true, fixed: true, width: 60 },
+{ text: '%id', value: '%id', sortable: true, fixed: true, width: 60 },
+{ text: '%id_nogaps', value: '%id_ng', sortable: true, fixed: true, width: 80 },
+{ text: '%coverage', value: '%cov', sortable: true, fixed: true, width: 80 },
+{ text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true, width: 80},
+{ text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true, width: 80},
 //{ text: 'overlapping repeats', value: 'n_overlapping_annots', sortable: true, fixed: true},
 { text: 'overlapping repeat family', value: 'overlapping_rep_fam', sortable: true, fixed: true},
 { text: 'MEI', value: 'MEI', fixed: true, width: 400 }
@@ -272,26 +272,26 @@ state.meis = props.meis
                     
                 </v-card-title>
                 <v-container class="pa-0 ma-0 pt-2 pl-4">
-                    <v-row class="pa-0 ma-0">
-                        <v-col cols="12" class="pa-0 ma-0">
+                    <v-row class="pa-0 ma-0" fluid>
+                        <v-col cols="12" class="pa-0 ma-0" fluid>
                             <v-container class="pa-0 ma-0">
                                 <v-row v-if="false" class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         ME type(s):
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-select v-model="state.selected_me_types" :items="['ALU', 'LINE1', 'SVA']" multiple hide-details clearable variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         ME families:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-select v-model="state.selected_me_families" :items="me_families" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
                                             <template v-slot:prepend-item>
                                                 <v-list-item title="Deselect All" @click="deselectAllMeiFams"></v-list-item>
@@ -303,16 +303,16 @@ state.meis = props.meis
                                             </template>
                                         </v-select>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         PAV genotypes:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-select v-model="state.selected_genotypes" :items="genotypes" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
                                             <template v-slot:prepend-item>
                                                 <v-list-item title="Deselect All" @click="deselectAllGenotypes"></v-list-item>
@@ -324,112 +324,112 @@ state.meis = props.meis
                                             </template>
                                         </v-select>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Insertion size range:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.me_ins_length_range" :min="0" :max="7000" :step="50" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.me_ins_length_range[0] }}bp - {{ state.me_ins_length_range[1] }}bp
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Percent identity range:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.pctid_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.pctid_range[0] }}% - {{ state.pctid_range[1] }}%
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Min ungapped %identity:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-slider v-model="state.min_pctid_nogaps" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.min_pctid_nogaps }}%
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Min insertion %coverage:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-slider v-model="state.min_pctcov" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.min_pctcov }}%
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Reference ME %coverage range:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.me_pctcov_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.me_pctcov_range[0] }}% - {{ state.me_pctcov_range[1] }}%
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         TSD length range:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.tsd_length_range" :min="0" :max="3000" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.tsd_length_range[0] }}bp - {{ state.tsd_length_range[1] }}bp
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         polyA/T length range:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.polyx_length_range" :min="0" :max="500" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.polyx_length_range[0] }}bp - {{ state.polyx_length_range[1] }}bp
                                     </v-col>
                                 </v-row>         
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Number of overlapping hg38 repeats:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.overlapping_repeats_range" :min="0" :max="10" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.overlapping_repeats_range[0] }} - {{ state.overlapping_repeats_range[1] }}
                                     </v-col>
                                 </v-row>  
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Overlapping hg38 repeat family:
                                     </v-col>
-                                    <v-col cols="6" class="pa-0 ma-0">
+                                    <v-col cols="8" class="pa-0 ma-0">
                                         <v-select v-model="state.selected_overlapping_rep_fams" :items="state.overlapping_rep_fams" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
                                             <template v-slot:prepend-item>
                                                 <v-list-item title="Deselect All" @click="deselectAllOverlappingRepFams"></v-list-item>
@@ -441,16 +441,16 @@ state.meis = props.meis
                                             </template>
                                         </v-select>
                                     </v-col>
-                                    <v-col cols="3" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="3" class="pa-0 ma-0">
+                                    <v-col cols="2" class="pa-0 ma-0">
                                         Display:
                                     </v-col>
-                                    <v-col cols="9" class="pa-0 ma-0">
+                                    <v-col cols="10" class="pa-0 ma-0">
                                         <v-radio-group v-model="state.display_mode" inline>
                                             <v-radio label="Sortable table" value="table" density="compact"></v-radio>
                                             <v-radio label="Full-size figures [much slower]" value="figures" density="compact" class="pl-2"></v-radio>
