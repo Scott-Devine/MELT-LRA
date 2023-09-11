@@ -14,7 +14,7 @@ from ncls import NCLS
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.3.0'
+VERSION = '1.3.1'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -1105,22 +1105,22 @@ def main():
             fatal("failed to write CSV output to " + args.csv_output)
         csv_fh.write(",".join(CSV_HEADERS) + "\n")
     
-    # fields for CSV output
-    csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
-                  # MELT CALU/LINEU
-                  'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs',
-                  # annotations
-                  'overlapping_annots',
-                  # VCF genotype and haplotype info
-                  'genotype',
-                  'hap1_region', 'hap2_region'
-                  ]
+        # fields for CSV output
+        csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
+                      # MELT CALU/LINEU
+                      'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs',
+                      # annotations
+                      'overlapping_annots',
+                      # VCF genotype and haplotype info
+                      'genotype',
+                      'hap1_region', 'hap2_region'
+                      ]
     
-    for mei in MEIs:
-        csv_fh.write(",".join([mei[f] if f in mei else '' for f in csv_fields]) + "\n")
-    csv_fh.close()
-        
-    # summary
+        for mei in MEIs:
+            csv_fh.write(",".join([mei[f] if f in mei else '' for f in csv_fields]) + "\n")
+        csv_fh.close()
+
+    summary
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
     info("found " + str(n_tsd_before) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _before_ the insertion point")
     info("found " + str(n_tsd_after) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _after_ the insertion point")
