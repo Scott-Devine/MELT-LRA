@@ -1,3 +1,6 @@
+v1.4.0 (October ?, 2023)
+ -Add single file build option using vite-plugin-singlefile and gzipped/uuencoded CSV files. (#25)
+
 v1.3.0 (September 8, 2023)
  -Add genotype and TIG_REGIONs to v1.3.0 CSV and UI. (#21)
  -Update UI to display and filter on overlapping hg38 repeat annotations. (#4, #16)
