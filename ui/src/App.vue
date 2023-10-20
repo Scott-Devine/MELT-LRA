@@ -39,7 +39,7 @@
     mei['TSD_length'] = mei['TSD_seq'].length
 
     let pxc = mei['polyX_coords'].split('-')
-    mei['polyX_length'] = pxc[1] - pxc[0] >= 0 ? pxc[1] - pxc[0] : 0
+    mei['polyX_length'] = pxc[1] - pxc[0] >= 0 ? pxc[1] - pxc[0] + 1 : 0
     mei['key'] = mei['chrom'] + ':' + mei['pos']
     return mei
   }
