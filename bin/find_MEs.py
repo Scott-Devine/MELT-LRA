@@ -14,7 +14,7 @@ from ncls import NCLS
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.3.1'
+VERSION = '1.4.0'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -495,6 +495,11 @@ def intersect_intervals(ivs, ii):
         elif i['x1'] <= ii['x2'] <= i['x2']:
             new_x1 = i['x1']
             new_x2 = ii['x2']
+        # ii contains i
+        elif ii['x1'] <= i['x1'] and ii['x2'] >= i['x2']:
+            new_x1 = i['x1']
+            new_x2 = i['x2']
+        
         if new_x1 is not None:
             res_ivs.append({'x1': new_x1, 'x2': new_x2})
         
@@ -505,6 +510,84 @@ def sum_interval_lengths(ivs):
     for i in ivs:
         s += i['x2'] - i['x1'] + 1
     return s
+
+# convert match string from read_water to list of alignment spans
+def parse_alignment_spans(align, strand):
+    ins_x1 = align['insertion_coords']['x1']
+    ins_x2 = align['insertion_coords']['x2']
+    me_x1 = align['ME_coords']['x1']
+    me_x2 = align['ME_coords']['x2']
+    match_str = align['match_str']
+    msl = len(match_str)
+    spans = []
+
+    debug("ins coords=" + str([ins_x1, ins_x2]) + " me coords=" + str([me_x1, me_x2]))
+    
+    # offsets from left side of the alignment - will add ins_x1, me_x1 to these
+    ins_o1 = 0
+    ins_o2 = 0
+    me_o1 = 0
+    me_o2 = 0
+    n_id_bp = 0
+
+    # add alignment span
+    def add_span():
+        nonlocal ins_o1, ins_o2, me_o1, me_o2, n_id_bp
+        if (((ins_o2 - ins_o1) != 0) and ((me_o2 - me_o1) != 0)):
+            # handle reverse strand matches
+            ins_c = None
+            me_c = None
+            len1 = None
+            
+            if (strand == '+'):
+                ins_c = [ins_x1 + ins_o1 - 1, ins_x1 + ins_o2 - 1]
+                me_c = [me_x1 + me_o1 - 1, me_x1 + me_o2 - 1]
+                len1 = ins_c[1] - ins_c[0] + 1
+                if ins_c[0] < 0:
+                    fatal("ins_c[0] < 0, ins_c=" + str(ins_c))
+            else:
+                ins_c = [ins_x2 - ins_o1 - 1, ins_x2 - ins_o2 - 1]
+                me_c = [me_x1 + me_o1 - 1, me_x1 + me_o2 - 1]
+                len1 = ins_c[0] - ins_c[1] + 1
+                if ins_c[1] < 0:
+                    fatal("ins_c[1] < 0, ins_c=" + str(ins_c))
+                
+            span = {
+                'ins': ins_c, 
+                'me': me_c,
+                'pct_id': (n_id_bp / len1) * 100.0
+            }
+
+            # sanity check
+            len2 = span['me'][1] - span['me'][0] + 1
+            if len1 != len2:
+                debug("span=" + str(span))
+                fatal("len1/len2 mismatch in add_span, len1=" + str(len1) + " len2=" + str(len2))
+                
+            spans.append(span)
+            n_id_bp = 0
+
+    # match string contains only ^ (gap in insertion), v (gap in ME), |, and .
+    for i in range(0, msl):
+        if (match_str[i] == '^'):
+            add_span()
+            ins_o2 += 1
+            ins_o1 = ins_o2
+            me_o1 = me_o2
+        elif (match_str[i] == 'v'):
+            add_span()
+            me_o2 += 1
+            ins_o1 = ins_o2
+            me_o1 = me_o2
+        else:
+            if (match_str[i] == '|'):
+                n_id_bp += 1
+            # start or extend span
+            ins_o2 += 1
+            me_o2 += 1
+
+    add_span()
+    return spans
 
 def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, min_pctcov, strand):
     ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len'])
@@ -519,7 +602,8 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
     # compute percent identity without gaps
     pctid_nogaps = (al['matches'] / (al['length'] - al['gaps'])) * 100.0
     
-    debug("checking " + ins_name + " for match, al=" + str(al))
+#    debug("checking " + ins_name + " for match, al=" + str(al))
+    debug("checking " + ins_name + " for match")
     if (al['pct_id'] >= min_pctid) and (pctid_nogaps >= min_pctid_nogaps):
         debug("checking " + ins_name + " for match, pctid is good ")
         ins_len = len(vcf_ins['ins'])
@@ -555,13 +639,57 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
                 
         #  trim intervals to insertion coords (e.g., for super-long TSDs)
         intervals = [trim_to_range({'x1': i['x1'], 'x2': i['x2']}, 0, vcf_ins['len']) for i in [tsd, polyX] if i['len'] > 0]
+        debug("insertion = " + vcf_ins['ins'])
         debug("intervals = " + str(intervals))
+        # take the union in case TSD, polyX overlap
         joined_intervals = union_intervals(intervals)
         joined_intervals_bp = sum_interval_lengths(joined_intervals)
+        # number of bp left in insertion after removing TSD, polyX
         remaining_bp = vcf_ins['len'] - joined_intervals_bp
+        debug("joined_intervals = " + str(joined_intervals))
         debug("joined_intervals_bp = " + str(joined_intervals_bp))
 
-        #  intersect overlapping intervals with alignment
+        # extract alignment spans from match_str
+        spans = parse_alignment_spans(al, strand)
+        debug(ins_name + " spans: " + str(spans) + "\n")
+
+        # compute precise %identity and %coverage from alignment spans
+        total_span_bp = 0
+        total_aligned_span_bp = 0
+        
+        for span in spans:
+            sx1 = span['ins'][0]
+            sx2 = span['ins'][1]
+            if (sx1 > sx2):
+                tmp = sx2
+                sx2 = sx1
+                sx1 = tmp
+            span_bp = sx2 - sx1 + 1
+                
+            # subtract joined_intervals from span
+            isecs = intersect_intervals(joined_intervals, { 'x1': sx1+1, 'x2': sx2+1 })
+            debug("intersecting joined intervals with " + str([sx1+1,sx2+1]) + " = " + str(isecs))
+            
+            # update total_span_bp, total_aligned_span_bp
+            subtract_bp = 0
+            for isec in isecs:
+                diff = isec['x2'] - isec['x1'] + 1
+                subtract_bp += diff
+
+            if subtract_bp > span_bp:
+                fatal("span_bp=" + str(span_bp) + " subtract_bp=" + str(subtract_bp))
+            new_span_bp = span_bp - subtract_bp
+            total_span_bp = total_span_bp + new_span_bp
+            # TODO - this is an estimate if subtract_bp > 0
+            total_aligned_span_bp += (new_span_bp * (span['pct_id']/100.0))
+                
+        if total_span_bp > remaining_bp:
+            fatal("total_span_bp (" + str(total_span_bp) + ") > remaining_bp (" + str(remaining_bp) + ")")
+
+        span_rem_ins_pctcov = (total_span_bp / remaining_bp) * 100.0 if remaining_bp > 0 else 0
+        span_rem_ins_pctid = (total_aligned_span_bp / total_span_bp) * 100.0 if total_span_bp > 0 else 0
+
+        #  intersect overlapping intervals with alignment span
         intersected_intervals = intersect_intervals(joined_intervals, al['insertion_coords'])
         intersected_intervals_bp = sum_interval_lengths(intersected_intervals)
         debug("intersected_intervals = " + str(intersected_intervals))
@@ -576,8 +704,11 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
         rem_ins_pctcov = (remaining_alignment_bp / remaining_bp) * 100.0 if remaining_bp > 0 else 0
         debug("remaining_bp = " + str(remaining_bp) + " remaining_alignment_bp = " + str(remaining_alignment_bp))
 
-        # TODO - now compute percent identity based solely on the portion of the alignment that was used in the coverage calculation
-
+        # TODO - compare span_rem_ins_pctcov (new value) with rem_ins_pctcov (old value)
+        debug(ins_name + ": old rem_ins_pctcov=" + str(rem_ins_pctcov) + " new span_rem_ins_pctcov=" + str(span_rem_ins_pctcov))
+        # TODO - compare span_rem_ins_pctid (new value) with pctid_nogaps (old value)
+        debug(ins_name + ": old pctid_nogaps=" + str(pctid_nogaps) + " new span_rem_ins_pctid=" + str(span_rem_ins_pctid))
+        
         # percent of the _entire_ insertion covered by the ME alignment
         ins_pctcov = (al_len / vcf_ins['len']) * 100.0
         me_pctcov =  (al_len_me / ME_LENGTHS[al['ME']]) * 100.0
@@ -685,7 +816,7 @@ def find_polyX_sliding_window(seq, base, start, offset, wlen, max_mismatches):
     
     if offset > 0:
         x1 = orig_start + 1
-        x2 = end + 1 - bp_trimmed
+        x2 = end - bp_trimmed
     else:
         x1 = end + 1 + bp_trimmed
         x2 = orig_start + 1
@@ -1120,7 +1251,7 @@ def main():
             csv_fh.write(",".join([mei[f] if f in mei else '' for f in csv_fields]) + "\n")
         csv_fh.close()
 
-    summary
+    # summary
     info("read " + str(len(vcf_insertions)) + " insertions from " + args.vcf)
     info("found " + str(n_tsd_before) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _before_ the insertion point")
     info("found " + str(n_tsd_after) + " insertion(s) of length >= " + str(args.min_seqlen) + " with TSDs _after_ the insertion point")
