@@ -1,4 +1,4 @@
-// convert MEI match string to alignment spans
+// convert MEI match string to alignment spans, expressed in 0-based interbase coordinates
 export function getAlignmentSpans (mei) {
     const[ins_x1, ins_x2] = mei.insertion_coords.split("-").map(x => x * 1.0)
     const[me_x1, me_x2] = mei.ME_coords.split("-").map(x => x * 1.0)
@@ -14,7 +14,7 @@ export function getAlignmentSpans (mei) {
     
     function add_span() {
         if (((ins_o2 - ins_o1) != 0) && ((me_o2 - me_o1) != 0)) {
-        // handle reverse strand matches
+            // handle reverse strand matches
             let ins_c = null 
             if (mei.strand == '+') {
                 ins_c = [ins_x1 + ins_o1 - 1, ins_x1 + ins_o2 - 1]
