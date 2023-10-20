@@ -546,7 +546,7 @@ def parse_alignment_spans(align, strand):
                 if ins_c[0] < 0:
                     fatal("ins_c[0] < 0, ins_c=" + str(ins_c))
             else:
-                ins_c = [ins_x2 - ins_o1 - 1, ins_x2 - ins_o2 - 1]
+                ins_c = [ins_x2 - ins_o1, ins_x2 - ins_o2]
                 me_c = [me_x1 + me_o1 - 1, me_x1 + me_o2 - 1]
                 len1 = ins_c[0] - ins_c[1] + 1
                 if ins_c[1] < 0:
@@ -664,7 +664,7 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
                 tmp = sx2
                 sx2 = sx1
                 sx1 = tmp
-            span_bp = sx2 - sx1 + 1
+            span_bp = sx2 - sx1
                 
             # subtract joined_intervals from span
             isecs = intersect_intervals(joined_intervals, { 'x1': sx1+1, 'x2': sx2+1 })
@@ -673,6 +673,7 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
             # update total_span_bp, total_aligned_span_bp
             subtract_bp = 0
             for isec in isecs:
+                # spans use 0-based interbase coordinates
                 diff = isec['x2'] - isec['x1'] + 1
                 subtract_bp += diff
 

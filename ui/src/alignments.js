@@ -19,7 +19,7 @@ export function getAlignmentSpans (mei) {
             if (mei.strand == '+') {
                 ins_c = [ins_x1 + ins_o1 - 1, ins_x1 + ins_o2 - 1]
             } else {
-                ins_c = [ins_x2 - ins_o1 - 1, ins_x2 - ins_o2 - 1]
+                ins_c = [ins_x2 - ins_o1, ins_x2 - ins_o2]
             }
             const span = {
                 'ins': ins_c, 
