@@ -778,6 +778,8 @@ def find_polyX_sliding_window(seq, base, start, offset, wlen, max_mismatches):
     nonbase_count = 0
     polyX_seq = ''
 
+    debug("find_polyX_sliding_window base=" + str(base) + " offset=" + str(offset) + " start=" + str(start))
+    
     def add_or_remove_base(pos, add, offset):
         nonlocal base_count
         nonlocal nonbase_count
@@ -817,19 +819,31 @@ def find_polyX_sliding_window(seq, base, start, offset, wlen, max_mismatches):
             start += offset
             wsize -= 1
 
+    debug("done, end = " + str(end))
+    debug("before nonbase trim = " + str(polyX_seq))
+            
     # trim nonbase characters, but only from the end (start is given and assumed to be correct?)
     nb_re = '[^' + base + ']+'
     rep = nb_re + '$' if offset > 0 else '^' + nb_re
     new_polyX_seq = re.sub(rep, '', polyX_seq, re.IGNORECASE)
     bp_trimmed = len(polyX_seq) - len(new_polyX_seq)
+
+    debug(" after nonbase trim = " + str(new_polyX_seq))
+    debug("bp_trimmed=" + str(bp_trimmed))
     
     if offset > 0:
         x1 = orig_start + 1
-        x2 = end - bp_trimmed
+        x2 = end + 1 - bp_trimmed
     else:
         x1 = end + 1 + bp_trimmed
         x2 = orig_start + 1
 
+    debug("final coords = " + str(x1) + " - " + str(x2))
+    # sanity check
+    clen = x2 - x1 + 1
+    if clen != len(new_polyX_seq):
+        fatal("find_polyX computed polyX len=" + str(clen) + " actual length=" + str(len(new_polyX_seq)))
+    
     only_matches_seq = re.sub(nb_re, '', new_polyX_seq, re.IGNORECASE)
         
     return { 'len': x2 - x1 + 1, 'x1': x1, 'x2': x2, 'score': len(only_matches_seq) }
