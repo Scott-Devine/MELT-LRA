@@ -666,14 +666,14 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
                 sx1 = tmp
             span_bp = sx2 - sx1
                 
-            # subtract joined_intervals from span
-            isecs = intersect_intervals(joined_intervals, { 'x1': sx1+1, 'x2': sx2+1 })
-            debug("intersecting joined intervals with " + str([sx1+1,sx2+1]) + " = " + str(isecs))
+            # subtract joined_intervals from span after converting to 1-based base coordinates
+            isecs = intersect_intervals(joined_intervals, { 'x1': sx1+1, 'x2': sx2 })
+            debug("intersecting joined intervals with " + str([sx1+1,sx2]) + " = " + str(isecs))
             
             # update total_span_bp, total_aligned_span_bp
             subtract_bp = 0
             for isec in isecs:
-                # spans use 0-based interbase coordinates
+                # intersected spans use 1-based base coordinates
                 diff = isec['x2'] - isec['x1'] + 1
                 subtract_bp += diff
 
@@ -681,7 +681,8 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
                 fatal("span_bp=" + str(span_bp) + " subtract_bp=" + str(subtract_bp))
             new_span_bp = span_bp - subtract_bp
             total_span_bp = total_span_bp + new_span_bp
-            # TODO - this is an estimate if subtract_bp > 0
+            # TODO - note that this is an estimate if subtract_bp > 0: it assumes the subtracted region has the same
+            # average percent identity as the entire alignment
             total_aligned_span_bp += (new_span_bp * (span['pct_id']/100.0))
                 
         if total_span_bp > remaining_bp:
@@ -705,10 +706,17 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
         rem_ins_pctcov = (remaining_alignment_bp / remaining_bp) * 100.0 if remaining_bp > 0 else 0
         debug("remaining_bp = " + str(remaining_bp) + " remaining_alignment_bp = " + str(remaining_alignment_bp))
 
-        # TODO - compare span_rem_ins_pctcov (new value) with rem_ins_pctcov (old value)
-        debug(ins_name + ": old rem_ins_pctcov=" + str(rem_ins_pctcov) + " new span_rem_ins_pctcov=" + str(span_rem_ins_pctcov))
-        # TODO - compare span_rem_ins_pctid (new value) with pctid_nogaps (old value)
-        debug(ins_name + ": old pctid_nogaps=" + str(pctid_nogaps) + " new span_rem_ins_pctid=" + str(span_rem_ins_pctid))
+        # sanity checks
+        if span_rem_ins_pctcov < 0 or span_rem_ins_pctcov > 100:
+            fatal("span_rem_ins_pctcov=" + str(span_rem_ins_pctcov))
+
+        if span_rem_ins_pctid < 0 or span_rem_ins_pctid > 100:
+            fatal("span_rem_ins_pctid=" + str(span_rem_ins_pctid))
+
+        # compare span_rem_ins_pctcov (new value) with rem_ins_pctcov (old value)
+        debug(ins_name + ": old rem_ins_pctcov=" + str(rem_ins_pctcov) + " new span_rem_ins_pctcov=" + str(span_rem_ins_pctcov) + " diff = " + str(span_rem_ins_pctcov - rem_ins_pctcov))
+        # compare span_rem_ins_pctid (new value) with pctid_nogaps (old value)
+        debug(ins_name + ": old pctid_nogaps=" + str(pctid_nogaps) + " new span_rem_ins_pctid=" + str(span_rem_ins_pctid) + " diff = " + str(span_rem_ins_pctid - pctid_nogaps))
         
         # percent of the _entire_ insertion covered by the ME alignment
         ins_pctcov = (al_len / vcf_ins['len']) * 100.0
@@ -862,8 +870,9 @@ def revcomp_na(seq):
 def write_me_fasta_fwd(ins, fasta_fh):
     seqid = ins['chrom'] + ':' +  str(ins['pos']) + ':' + ins['me_match']['strand']
     
-    # TODO - do we pass entire insertion seq or limit it to region that matches ref ME?
-    #  shouldn't be much difference if everything's working correctly
+    # NOTE: we're passing the entire insertion seq but could limit it to the region that matches ref ME
+    # shouldn't be much difference if everything's working correctly, and passing the entire seq makes
+    # it easier to detect discrepancies between the two Smith-Waterman alignments (pipeline and cALU/LINEu)
     seq = ins['alt'][1:]
 
     # revcomp sequence if needed
@@ -908,7 +917,6 @@ def run_melt_calu_lineu(MEIs_d, melt_jar, melt_exec, fasta_file_path):
             if mei['fasta_id'] != fasta_id:
                 fatal("seqid mismatch for " + mei['fasta_id'] + " / " + fasta_id)
 
-            # TODO - cross-validate results with mei['alignment']?
             mei['ME_family'] = family
             mei['ME_subfamily'] = subfamily
             mei['ME_start'] = str(start)
@@ -1111,7 +1119,7 @@ def main():
     # read VCF contigs
     vcf_contigs = read_vcf_contigs(args.vcf)
 
-    # TODO - incorporate MD5 check from checkVCFReferenceSeqs.py
+    # TODO - incorporate MD5 checks from checkVCFReferenceSeqs.py
     
     # read VCF insertions
     vcf_insertions = read_vcf_insertions(args.vcf, fasta_files, args.seqid, skip_seqids)
@@ -1225,9 +1233,6 @@ def main():
         mei['overlapping_annots'] = ""
         annots = get_overlapping_annotation(annots_by_chrom, mei['chrom'], int(mei['pos']), int(mei['pos']) + 1)
         mei['overlapping_annots'] = "|".join([":".join([a[5], a[6], a[7], a[9], a[10], a[11], a[12], a[13]])  for a in annots])
-#        if (len(annots) > 0):
-#            sys.stderr.write("found " + str(len(annots)) + " overlapping annots for MEI " + mei['chrom'] + ":" + str(mei['pos']) + " - " + mei['overlapping_annots'] + "\n")
-#            sys.stderr.flush()
         
     # CSV output
     csv_fh = None
