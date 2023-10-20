@@ -844,19 +844,6 @@ def check_insertion_for_polyA(vcf_ins, window_size_bp, max_mismatch_bp):
 #    vcf_ins['polyT'] = find_polyX_exact(ins, 'T', vcf_ins['tsds']['after']['len'], 1)
     vcf_ins['polyT'] = find_polyX_sliding_window(ins, 'T', vcf_ins['tsds']['after']['len'], 1, window_size_bp, max_mismatch_bp)
 
-#    print(ins)
-#    print(pfeat2(len(ins), vcf_ins['polyA'], 'polyA'))
-#    print(pfeat2(len(ins), vcf_ins['polyT'], 'polyT'))
-    
-    # sanity check - exact match against polyX_sliding_window
-#    pa_e = find_polyX_sliding_window(ins, 'A', len(ins) - 1, -1, 1, 0)
-#    pt_e = find_polyX_sliding_window(ins, 'T', vcf_ins['tsds']['after']['len'], 1, 1, 0)
-#    if pa_e['x1'] != vcf_ins['polyA']['x1'] or pa_e['x2'] != vcf_ins['polyA']['x2']:
-#        fatal("polyA mismatch: " + str(vcf_ins['polyA']) + " - " + str(pa_e))
-#    if pt_e['x1'] != vcf_ins['polyT']['x1'] or pt_e['x2'] != vcf_ins['polyT']['x2']:
-#        fatal("polyT mismatch: " + str(vcf_ins['polyT']) + " - " + str(pt_e))
-
-
 # ------------------------------------------------------
 # write_me_fasta_fwd
 # ------------------------------------------------------
@@ -1104,15 +1091,6 @@ def main():
     if args.ucsc_rmsk:
         annots_by_chrom = read_ucsc_rmsk(args.ucsc_rmsk)
 
-        # DEBUG
-#        info("chr1:33052507")
-#        chr1_ncl = annots_by_chrom['chr1'] 
-#        for j in chr1_ncl['ncl'].find_overlap(33052507,33052507):
-#            info(j, chr1_ncl['rows'][j[2]])
-
-#        annots = get_overlapping_annotation(annots_by_chrom, 'chr1', 33052507, 33052507)
-#        info("get_overlapping_annotation = " + str(annots))
-        
     # read reference FASTA files
     fasta_files = read_fasta_dir(args.fasta_dir, args.seqid, skip_seqids)
 
