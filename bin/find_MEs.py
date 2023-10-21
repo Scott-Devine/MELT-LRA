@@ -35,7 +35,7 @@ ME_LENGTHS = {
 }
 
 # CSV output
-CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
+CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
                'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots', 'genotype', 'hap1_region', 'hap2_region']
 CSV_FLANKING_SEQ_BP = 30
 
@@ -589,7 +589,7 @@ def parse_alignment_spans(align, strand):
     add_span()
     return spans
 
-def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, min_pctcov, strand):
+def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand):
     ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len'])
     if ins_name not in aligns:
         # ugh
@@ -602,10 +602,9 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
     # compute percent identity without gaps
     pctid_nogaps = (al['matches'] / (al['length'] - al['gaps'])) * 100.0
     
-#    debug("checking " + ins_name + " for match, al=" + str(al))
     debug("checking " + ins_name + " for match")
-    if (al['pct_id'] >= min_pctid) and (pctid_nogaps >= min_pctid_nogaps):
-        debug("checking " + ins_name + " for match, pctid is good ")
+    if (pctid_nogaps >= min_pctid):
+        debug("checking " + ins_name + " for match, pctid_nogaps is in range ")
         ins_len = len(vcf_ins['ins'])
         me_x1 = al['insertion_coords']['x1']
         me_x2 = al['insertion_coords']['x2']
@@ -712,23 +711,18 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctid_nogaps, m
 
         if span_rem_ins_pctid < 0 or span_rem_ins_pctid > 100:
             fatal("span_rem_ins_pctid=" + str(span_rem_ins_pctid))
-
-        # compare span_rem_ins_pctcov (new value) with rem_ins_pctcov (old value)
-        debug(ins_name + ": old rem_ins_pctcov=" + str(rem_ins_pctcov) + " new span_rem_ins_pctcov=" + str(span_rem_ins_pctcov) + " diff = " + str(span_rem_ins_pctcov - rem_ins_pctcov))
-        # compare span_rem_ins_pctid (new value) with pctid_nogaps (old value)
-        debug(ins_name + ": old pctid_nogaps=" + str(pctid_nogaps) + " new span_rem_ins_pctid=" + str(span_rem_ins_pctid) + " diff = " + str(span_rem_ins_pctid - pctid_nogaps))
         
         # percent of the _entire_ insertion covered by the ME alignment
         ins_pctcov = (al_len / vcf_ins['len']) * 100.0
         me_pctcov =  (al_len_me / ME_LENGTHS[al['ME']]) * 100.0
-        debug("checking " + ins_name + " for match, ins_pctcov=" + str(ins_pctcov) + " me_pctcov=" + str(me_pctcov))
-        if rem_ins_pctcov >= min_pctcov:
+        debug("checking " + ins_name + " for match, span_rem_ins_pctcov=" + str(span_rem_ins_pctcov) + " me_pctcov=" + str(me_pctcov))
+
+        if span_rem_ins_pctcov >= min_pctcov and span_rem_ins_pctid >= min_pctid:
             debug("checking " + ins_name + " for match, ins_pctcov is good, setting match to nonempty")
             me_match = {
                 'ME': al['ME'],
-                'pctid':al['pct_id'],
-                'pctid_nogaps':pctid_nogaps,
-                'rem_ins_pctcov': rem_ins_pctcov,
+                'pctid': span_rem_ins_pctid,
+                'rem_ins_pctcov': span_rem_ins_pctcov,
                 'ins_pctcov': ins_pctcov,
                 'me_pctcov': me_pctcov,
                 'alignment': al,
@@ -966,13 +960,12 @@ def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
     remaining_bp = ins['len'] - l_bp - r_bp
     ins_str = ins['alt'][1:l_bp+1] + "..." + ("+" + str(remaining_bp) + "bp").center(middle_bp-6,".") + "..." + ins['alt'][-r_bp:]
 
-    pctid_str = (str(ins['me_match']['pctid']) + "%").rjust(6)
-    pctid_nogaps_str = (('%.1f' % ins['me_match']['pctid_nogaps']) + "%").rjust(6)
+    pctid_str = (('%.1f' % ins['me_match']['pctid']) + "%").rjust(6)
     # percent of insert covered by alignment
     rem_ins_pctcov_str = (("%.1f" % ins['me_match']['rem_ins_pctcov']) + "%").rjust(6)
     # percent of reference ME sequence covered by alignment
     me_pctcov_str = (("%.1f" % ins['me_match']['me_pctcov']) + "%").rjust(6)
-    me_str = ins['me_match']['ME'].ljust(5) + "|" + ins['me_match']['strand'].ljust(3) + "|" + me_pctcov_str + "|" + pctid_str + "|" + pctid_nogaps_str + "|" + rem_ins_pctcov_str
+    me_str = ins['me_match']['ME'].ljust(5) + "|" + ins['me_match']['strand'].ljust(3) + "|" + me_pctcov_str + "|" + pctid_str + "|" + rem_ins_pctcov_str
     print(pos_str + "|" + me_str + "| " + seq_before + " [" + ins_str + "] " + seq_after)
 
     # print TSD, polyA position
@@ -1042,7 +1035,6 @@ def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
         'ME': ins['me_match']['ME'],
         '%ME': me_pctcov_str.strip(),
         '%id': pctid_str.strip(),
-        '%id_ng': pctid_nogaps_str.strip(),
         '%cov': rem_ins_pctcov_str.strip(),
         'insertion_seq': ins['alt'][1:],
         'left_flank_seq': l_flank,
@@ -1075,9 +1067,8 @@ def main():
     parser.add_argument('--line_water_rev', required=True, help='Path to LINE1 water reverse strand alignment output file.')
     parser.add_argument('--min_seqlen', required=False, type=int, default=100, help='Minimum insertion sequence length.')
     parser.add_argument('--max_seqlen', required=False, type=int, default=50000, help='Maximum insertion sequence length.')
-    parser.add_argument('--min_pctid', required=False, type=int, default=90, help='Minimum percent identity of alignment.')
-    parser.add_argument('--min_pctid_nogaps', required=False, type=int, default=90, help='Minimum percent identity of alignment ignoring gaps.')
-    parser.add_argument('--min_pctcov', required=False, type=int, default=85, help='Minimum percent coverage of alignment.')
+    parser.add_argument('--min_pctid', required=False, type=int, default=90, help='Minimum average percent identity of aligned regions.')
+    parser.add_argument('--min_pctcov', required=False, type=int, default=85, help='Minimum percent coverage of insertion minus TSD and polyX by aligned regions.')
     parser.add_argument('--polyx_window_bp', required=False, type=int, default=4, help='Sliding window size for polyA/polyT detection.')
     parser.add_argument('--polyx_max_mismatch_bp', required=False, type=int, default=1, help='Maximum number of mismatches in sliding window for polyA/polyT detection.')
     parser.add_argument('--seqid', required=False, help='Optional sequence id: process only insertions on this reference sequence.')
@@ -1152,7 +1143,7 @@ def main():
     MEIs_d = {}
     
     # stdout summary output
-    print("Location        |ME   |+/-|%ME   |%id   |%id_ng|%cov  | insertion")
+    print("Location        |ME   |+/-|%ME   |%id   |%cov  | insertion")
         
     n_tsd_before = 0
     n_tsd_after = 0
@@ -1174,12 +1165,12 @@ def main():
             warn(ins_position_str(vcf_ins) + " polyA and polyT both have score " + str(vcf_ins['polyA']['score']))
         
         # check for qualifying match with mobile element
-        alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
-        alu_rev_match = check_insertion_for_ME_match(vcf_ins, alu_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
-        sva_match = check_insertion_for_ME_match(vcf_ins, sva_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
-        sva_rev_match = check_insertion_for_ME_match(vcf_ins, sva_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
-        line_match = check_insertion_for_ME_match(vcf_ins, line_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '+')
-        line_rev_match = check_insertion_for_ME_match(vcf_ins, line_rev_aligns, args.min_pctid, args.min_pctid_nogaps, args.min_pctcov, '-')
+        alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctcov, '+')
+        alu_rev_match = check_insertion_for_ME_match(vcf_ins, alu_rev_aligns, args.min_pctid, args.min_pctcov, '-')
+        sva_match = check_insertion_for_ME_match(vcf_ins, sva_aligns, args.min_pctid, args.min_pctcov, '+')
+        sva_rev_match = check_insertion_for_ME_match(vcf_ins, sva_rev_aligns, args.min_pctid, args.min_pctcov, '-')
+        line_match = check_insertion_for_ME_match(vcf_ins, line_aligns, args.min_pctid, args.min_pctcov, '+')
+        line_rev_match = check_insertion_for_ME_match(vcf_ins, line_rev_aligns, args.min_pctid, args.min_pctcov, '-')
         matches = [m for m in [alu_match, alu_rev_match, sva_match, sva_rev_match, line_match, line_rev_match] if m is not None]
         n_matches = len(matches)
 
@@ -1235,7 +1226,7 @@ def main():
         csv_fh.write(",".join(CSV_HEADERS) + "\n")
     
         # fields for CSV output
-        csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%id_ng', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
+        csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
                       # MELT CALU/LINEU
                       'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs',
                       # annotations
