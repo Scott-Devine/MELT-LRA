@@ -191,6 +191,13 @@ function load_new_data() {
     
     state.total_mei_counts = me_type_counts
     state.total_family_counts = me_family_counts
+
+    me_families.forEach(mf => {
+        if (!(mf in me_family_counts)) {
+            me_family_counts[mf] = 0
+        }
+    })
+
     state.overlapping_rep_fams = Object.keys(ol_rep_counts).sort()
     state.selected_overlapping_rep_fams = Object.keys(ol_rep_counts).sort()
     state.total_overlapping_rep_counts = ol_rep_counts
