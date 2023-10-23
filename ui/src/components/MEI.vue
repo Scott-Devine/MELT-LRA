@@ -120,7 +120,7 @@
     if (d['type'] == 's') d['color'] = base_colors[d['seq_to']]
   })
 
-  const me_ref_str = ": " + mei['%ME'] + "% coverage at " + mei['%id_ng'] + "% identity"
+  const me_ref_str = ": " + mei['%ME'] + "% coverage at " + mei['%id'] + "% identity"
 
   // color key - percent identity
   const cb_height = 20

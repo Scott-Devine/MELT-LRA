@@ -148,7 +148,7 @@ spans.forEach(s => {
     s.points_str = s.points.join(" ")
 })
 
-const me_ref_str = ": " + mei['%ME'] + "% coverage, " + mei['%id_ng'] + "% id"
+const me_ref_str = ": " + mei['%ME'] + "% coverage, " + mei['%id'] + "% id"
 
 // color key
 const cb_height = 10
