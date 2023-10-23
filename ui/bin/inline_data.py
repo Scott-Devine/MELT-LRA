@@ -67,10 +67,12 @@ def add_csv_file(js_fh, dpath, file):
             encoded_data += line.strip()
         
     # insert encoded data into output JS file
+    var_name = re.sub(r'[\.\-\s]', '_', file) 
+    
     js_fh.write("// " + sample_id + "\n")
-    js_fh.write("const enc_" + sample_id + " = `" + encoded_data + "`;\n\n")
+    js_fh.write("const " + var_name + " = `" + encoded_data + "`;\n\n")
 
-    return { 'sample_id': sample_id, 'var': 'enc_' + sample_id, 'file': file }
+    return { 'sample_id': sample_id, 'var': var_name, 'file': file }
     
 
 # ------------------------------------------------------
