@@ -21,7 +21,6 @@ const headers = [
 { text: 'ins_size', value: 'insertion_size', sortable: true, fixed: true, width: 80 },
 { text: '%ME', value: '%ME', sortable: true, fixed: true, width: 60 },
 { text: '%id', value: '%id', sortable: true, fixed: true, width: 60 },
-{ text: '%id_nogaps', value: '%id_ng', sortable: true, fixed: true, width: 80 },
 { text: '%coverage', value: '%cov', sortable: true, fixed: true, width: 80 },
 { text: 'TSD_bp', value: 'TSD_length', sortable: true, fixed: true, width: 80},
 { text: 'polyA/T_bp', value: 'polyX_length', sortable: true, fixed: true, width: 80},
@@ -66,7 +65,6 @@ const state = reactive({
     selected_overlapping_rep_counts: {},
     headers: headers,
     pctid_range: [0.0, 100.0],
-    min_pctid_nogaps: 90.0,
     min_pctcov: 90.0,
     me_pctcov_range: [0.0, 100.0],
     me_ins_length_range: [0.0, 7000.0],
@@ -82,7 +80,6 @@ function reset_filters() {
     state.selected_genotypes = genotypes
     state.pctid_range[0] = 0.0
     state.pctid_range[1] = 100.0
-    state.min_pctid_nogaps = 90.0
     state.min_pctcov = 90.0
     state.me_pctcov_range[0] = 0.0
     state.me_pctcov_range[1] = 100.0
@@ -148,8 +145,7 @@ function update_selected_meis() {
     })
 
     state.meis.forEach(m => {
-        if ((m['%id_ng'] >= state.min_pctid_nogaps) 
-        && (m['%cov'] >= state.min_pctcov) 
+        if ((m['%cov'] >= state.min_pctcov)
         && (m['%id'] >= state.pctid_range[0]) && (m['%id'] <= state.pctid_range[1])
         && (m['%ME'] >= state.me_pctcov_range[0]) && (m['%ME'] <= state.me_pctcov_range[1])
         && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
@@ -205,7 +201,6 @@ function load_new_data() {
 }
 
 watch(() => props.meis, (newValue) => { state.meis = newValue })
-watch(() => state.min_pctid_nogaps, (newValue) => { update_selected_meis() })
 watch(() => state.pctid_range, (newValue) => { update_selected_meis() })
 watch(() => state.min_pctcov, (newValue) => { update_selected_meis() })
 watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
@@ -350,18 +345,6 @@ state.meis = props.meis
                                     </v-col>
                                     <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.pctid_range[0] }}% - {{ state.pctid_range[1] }}%
-                                    </v-col>
-                                </v-row>
-                                
-                                <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
-                                        Min ungapped %identity:
-                                    </v-col>
-                                    <v-col cols="8" class="pa-0 ma-0">
-                                        <v-slider v-model="state.min_pctid_nogaps" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
-                                    </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
-                                        {{ state.min_pctid_nogaps }}%
                                     </v-col>
                                 </v-row>
                                 
