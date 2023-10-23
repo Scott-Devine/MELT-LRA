@@ -148,7 +148,7 @@ spans.forEach(s => {
     s.points_str = s.points.join(" ")
 })
 
-const me_ref_str = ": " + mei['%ME'] + "% coverage, " + mei['%id'] + "% id"
+const me_ref_str = ": " + mei['%ME'] + "% ME coverage, " + mei['%id'] + "% id"
 
 // color key
 const cb_height = 10
@@ -235,8 +235,8 @@ const state = reactive({
     <!-- reference ME axis -->
     <g v-axis="state.me_xaxis" class="xaxis" :transform="`translate(0,${state.me_axis_y})`">
     </g>
-    <text v-if="state.mei.strand == '+'" class="me_label" :x="state.me_xscale(state.me_len/2)" :y="state.me_lbl_y" fill="white" text-anchor="middle">{{ state.me_len + " bp " + state.mei.ME + " reference " + me_ref_str + " >>>"}}</text>
-    <text v-else class="me_label" :x="state.me_xscale(state.me_len/2)" :y="state.me_lbl_y" fill="white" text-anchor="middle">{{ "<<< " + state.me_len + " bp " + state.mei.ME + me_ref_str}}</text>
+    <text v-if="state.mei.strand == '+'" class="me_label" :x="state.me_xscale(state.me_len/2)" :y="state.me_lbl_y" fill="white" text-anchor="middle">{{ state.mei.ME +  me_ref_str + " >>>"}}</text>
+    <text v-else class="me_label" :x="state.me_xscale(state.me_len/2)" :y="state.me_lbl_y" fill="white" text-anchor="middle">{{ "<<< " + state.mei.ME + me_ref_str}}</text>
     
     <!-- match/alignment spans -->
     <polygon v-for="s in state.spans" :points="s.points_str" :fill="pctid_color(s.pct_id, 0.5)" :stroke="pctid_color(s.pct_id, 1.0)" stroke-width="2" />

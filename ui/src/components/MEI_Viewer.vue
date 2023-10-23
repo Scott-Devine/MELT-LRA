@@ -65,7 +65,7 @@ const state = reactive({
     selected_overlapping_rep_counts: {},
     headers: headers,
     pctid_range: [0.0, 100.0],
-    min_pctcov: 90.0,
+    min_pctcov: 80.0,
     me_pctcov_range: [0.0, 100.0],
     me_ins_length_range: [0.0, 7000.0],
     tsd_length_range: [0.0, 3000.0],
@@ -80,7 +80,7 @@ function reset_filters() {
     state.selected_genotypes = genotypes
     state.pctid_range[0] = 0.0
     state.pctid_range[1] = 100.0
-    state.min_pctcov = 90.0
+    state.min_pctcov = 80.0
     state.me_pctcov_range[0] = 0.0
     state.me_pctcov_range[1] = 100.0
     state.me_ins_length_range[0] = 0.0
@@ -360,7 +360,7 @@ state.meis = props.meis
                                         Min insertion %coverage:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
-                                        <v-slider v-model="state.min_pctcov" :min="90" :max="100" :step="1" thumb-label hide-details></v-slider>
+                                        <v-slider v-model="state.min_pctcov" :min="80" :max="100" :step="1" thumb-label hide-details></v-slider>
                                     </v-col>
                                     <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.min_pctcov }}%
