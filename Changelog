@@ -1,4 +1,4 @@
-v1.4.0 (October ?, 2023)
+v1.4.0 (October 24, 2023)
  -Remove --min_pctid_nogaps parameter; no longer needed due to #8.
  -Compute percent identity using only the portion of the alignment used in the coverage calculation. (#8)
  -Compute percent coverage based on individual alignment spans instead of min-max coverage range. (#26)
