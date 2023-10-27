@@ -14,7 +14,7 @@ from ncls import NCLS
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.4.0'
+VERSION = '1.4.1'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
@@ -589,14 +589,24 @@ def parse_alignment_spans(align, strand):
     add_span()
     return spans
 
-def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand):
+def get_insertion_alignments(vcf_ins, aligns):
     ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']+1) + '-INS-' + str(vcf_ins['len'])
     if ins_name not in aligns:
-        # ugh
         ins_name = vcf_ins['chrom'] + '-' + str(vcf_ins['pos']) + '-INS-' + str(vcf_ins['len'])
         if ins_name not in aligns:
             fatal("no alignment found for " + ins_name)
     al = aligns[ins_name]
+    return (ins_name, al)
+
+def trim_to_range(i, min, max):
+    if i['x1'] < min:
+        i['x1'] = min
+    if i['x2'] > max:
+        i['x2'] = max
+    return i
+    
+def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand):
+    (ins_name, al) = get_insertion_alignments(vcf_ins, aligns)
     me_match = None
 
     # compute percent identity without gaps
@@ -629,13 +639,6 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand)
 
         # compute percent of the insertion covered by the ME alignment after removing TSD + polyX
         #  make list of intervals to remove (e.g., TSD, polyX)
-        def trim_to_range(i, min, max):
-            if i['x1'] < min:
-                i['x1'] = min
-            if i['x2'] > max:
-                i['x2'] = max
-            return i
-                
         #  trim intervals to insertion coords (e.g., for super-long TSDs)
         intervals = [trim_to_range({'x1': i['x1'], 'x2': i['x2']}, 0, vcf_ins['len']) for i in [tsd, polyX] if i['len'] > 0]
         debug("insertion = " + vcf_ins['ins'])
@@ -729,7 +732,89 @@ def check_insertion_for_ME_match(vcf_ins, aligns, min_pctid, min_pctcov, strand)
                 'strand': strand
             }
     return me_match
+
+def check_insertion_for_5_prime_inverted_ME_match(vcf_ins, aligns, rev_aligns, min_pctid, min_pctcov):
+    (fwd_name, fwd_al) = get_insertion_alignments(vcf_ins, aligns)
+    (rev_name, rev_al) = get_insertion_alignments(vcf_ins, rev_aligns)
+
+    debug("checking " + fwd_name + " for 5'-inverted match")
     
+    # do rough check of total coverage - we already know neither strand alone is sufficient
+    fwd_x1 = fwd_al['insertion_coords']['x1']
+    fwd_x2 = fwd_al['insertion_coords']['x2']
+
+    rev_x1 = fwd_al['insertion_coords']['x1']
+    rev_x2 = fwd_al['insertion_coords']['x2']
+
+    #  trim intervals to insertion coords (e.g., for super-long TSDs)
+    intervals = []
+    if 'tsds' in vcf_ins:
+        if 'after' in vcf_ins['tsds']:
+            intervals.append(vcf_ins['tsds']['after'])
+
+    if 'polyX' in vcf_ins:
+        intervals.append(vcf_ins['polyX'])
+
+    intervals = [trim_to_range({'x1': i['x1'], 'x2': i['x2']}, 0, vcf_ins['len']) for i in intervals if i['len'] > 0]
+    debug("insertion = " + vcf_ins['ins'])
+    debug("intervals = " + str(intervals))
+    # take the union in case TSD, polyX overlap
+    joined_intervals = union_intervals(intervals)
+    joined_intervals_bp = sum_interval_lengths(joined_intervals)
+    # number of bp left in insertion after removing TSD, polyX
+
+#    remaining_bp = vcf_ins['len'] - joined_intervals_bp
+    remaining_bp = vcf_ins['len']
+
+    debug("joined_intervals = " + str(joined_intervals))
+    debug("joined_intervals_bp = " + str(joined_intervals_bp))
+
+    # TODO - subtract joined intervals from fwd/rev matches
+    combined = union_intervals([{'x1': fwd_x1, 'x2': fwd_x2}, {'x1': rev_x1, 'x2': rev_x2}])
+    combined_bp = 0
+    for i in combined:
+        combined_bp += i['x2'] - i['x1'] + 1
+
+    me_match = None
+    pctid_nogaps = (fwd_al['matches'] / (fwd_al['length'] - fwd_al['gaps'])) * 100.0
+    pctcov =  (combined_bp / remaining_bp) * 100.0
+
+    fwd_pctid = (fwd_al['matches'] / (fwd_al['length'] - fwd_al['gaps'])) * 100.0
+    fwd_pctid_str = "%.1f" % fwd_pctid
+    rev_pctid = (rev_al['matches'] / (rev_al['length'] - rev_al['gaps'])) * 100.0
+    rev_pctid_str = "%.1f" % rev_pctid
+    fwd_bp = fwd_x2 - fwd_x1 + 1
+    rev_bp = fwd_x2 - fwd_x1 + 1
+    avg_pctid = (fwd_pctid + rev_pctid) / 2
+    avg_pctid_str = "%.1f" % avg_pctid
+
+    if pctcov >= min_pctcov and avg_pctid > min_pctid:
+        debug("fwd_bp=" + str(fwd_bp) + " fwd_pctid=" + fwd_pctid_str + " rev_bp=" + str(rev_bp) + " rev_pctid=" + rev_pctid_str)
+        debug("avg_pctid=" + avg_pctid_str + " combined pctcov=" + str(pctcov))
+
+        me_fwd_match = {
+            'ME': fwd_al['ME'],
+            'pctid': fwd_pctid,
+            'rem_ins_pctcov': pctcov,
+            'ins_pctcov': pctcov,
+            'me_pctcov': pctcov,
+            'alignment': fwd_al,
+            'strand': '+'
+        }
+
+        me_rev_match = {
+            'ME': rev_al['ME'],
+            'pctid': rev_pctid,
+            'rem_ins_pctcov': pctcov,
+            'ins_pctcov': pctcov,
+            'me_pctcov': pctcov,
+            'alignment': rev_al,
+            'strand': '-'
+        }
+
+        return (me_fwd_match, me_rev_match)
+    return None
+
 # find polyA/polyT using exact match
 #
 #  seq - sequence to search for polyA/polyT
@@ -1176,14 +1261,47 @@ def main():
 
         # sort matches and pick the highest-scoring
         me_match = None
+        inv_matches = None
+
         if n_matches > 0:
             sorted_matches = sorted(matches, key = lambda x: x['alignment']['score'], reverse=True)
             me_match = sorted_matches[0]
             # kick the can down the road
             if n_matches > 1 and sorted_matches[0]['alignment']['score'] == sorted_matches[1]['alignment']['score']:
                 fatal("multiple qualifying matches with the same score: " + str(sorted_matches))
-                
+
+        # check for possible 5' inversions - do any matches qualify if both strands are combined?
+        elif False:
+            # TODO - may not be an issue for Alus (or SVA) due to >= 500bp requirement
+            alu_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, alu_aligns, alu_rev_aligns, args.min_pctid, args.min_pctcov)
+            sva_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, sva_aligns, sva_rev_aligns, args.min_pctid, args.min_pctcov)
+            line1_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, line_aligns, line_rev_aligns, args.min_pctid, args.min_pctcov)
+
+            if line1_matches is not None:
+                inv_matches = line1_matches
+            elif alu_matches is not None:
+                inv_matches = alu_matches
+            elif sva_matches is not None:
+                inv_matches = sva_matches
+
+            # add both matches
+            if inv_matches is not None:
+                # forward
+                vcf_ins['me_match'] = inv_matches[0]
+                ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta_fh, line_fasta_fh)
+                MEIs.append(ins_d)
+                if 'fasta_id' in ins_d:
+                    MEIs_d[ins_d['fasta_id']] = ins_d
+
+                # reverse
+                vcf_ins['me_match'] = inv_matches[1]
+                ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta_fh, line_fasta_fh)
+                MEIs.append(ins_d)
+                if 'fasta_id' in ins_d:
+                    MEIs_d[ins_d['fasta_id']] = ins_d
+
         vcf_ins['me_match'] = me_match
+
         if me_match is not None:
             n_me_match += 1
             # don't expect this to happen for PAV-called L1-mediated insertions:
