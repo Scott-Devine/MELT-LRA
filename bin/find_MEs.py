@@ -1141,7 +1141,7 @@ def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
 # ------------------------------------------------------
 def main():
     # input
-    parser = argparse.ArgumentParser(description='Check FASTA sequences against a set of VCF reference contigs.')
+    parser = argparse.ArgumentParser(description='Identify MEIs in a PAV-generated VCF file of sequence variants.')
     parser.add_argument('--vcf', required=True, help='Path to VCF file containing contigs to check.')
     parser.add_argument('--fasta_dir', required=True, help='Path to directory that contains FASTA reference files.')
     parser.add_argument('--alu_water', required=True, help='Path to ALU water alignment output file.')
