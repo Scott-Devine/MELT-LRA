@@ -25,13 +25,19 @@ def log_fatal(msg):
 # extract_seqs
 # ------------------------------------------------------
 
-def extract_seqs(vcf, min_seqlen):
+def extract_seqs(vcf, min_seqlen, max_seqlen):
     n_seqs = 0
     n_extracted = 0
+    n_below_min = 0
+    n_above_max = 0
+    # check for exact duplicates
+    vcf_ids = {}
+    lnum = 0
     
     with gzip.open(vcf, 'rt') as fh:
         cr = csv.reader(fh, delimiter='\t')
         for row in cr:
+            lnum += 1
             if re.match(r'^#', row[0]):
                 continue
             
@@ -56,13 +62,22 @@ def extract_seqs(vcf, min_seqlen):
                 log_fatal("alt[0] (" + alt[0] + " != ref (" + ref + ")")
 
             alt = alt[1:]
-            if len(alt) >= min_seqlen:
+            if len(alt) >= min_seqlen and len(alt) <= max_seqlen:
                 n_extracted += 1
+                if vcf_id in vcf_ids:
+                    log_fatal("duplicate vcf_id " + vcf_id + " at line " + str(lnum))
+                vcf_ids[vcf_id] = True
                 print(">", vcf_id + " " + chrom + ":" + pos + " " + info)
                 print(alt)
-            
+            elif len(alt) < min_seqlen:
+                n_below_min += 1
+            elif len(alt) > max_seqlen:
+                n_above_max += 1
+
         log_info("extracted " + str(n_extracted) + "/" + str(n_seqs) + " sequences from insertion variants")
-                
+        log_info("ignored " + str(n_below_min) + "/" + str(n_seqs) + " sequences below minimum length")
+        log_info("ignored " + str(n_above_max) + "/" + str(n_seqs) + " sequences above maximum length")
+    
 # ------------------------------------------------------
 # main()
 # ------------------------------------------------------
@@ -73,8 +88,9 @@ def main():
     parser = argparse.ArgumentParser(description='Extract insertion sequences.')
     parser.add_argument('--vcf', required=True, help='Path to input VCF file.')
     parser.add_argument('--min_seqlen', required=False, type=int, default=1, help='Minimum insertion sequence length.')
+    parser.add_argument('--max_seqlen', required=False, type=int, default=1000000, help='Maximum insertion sequence length.')
     args = parser.parse_args()
-    extract_seqs(args.vcf, args.min_seqlen)
+    extract_seqs(args.vcf, args.min_seqlen, args.max_seqlen)
         
 if __name__ == '__main__':
     main()

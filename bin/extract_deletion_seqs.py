@@ -30,6 +30,9 @@ def extract_seqs(vcf, min_seqlen, max_seqlen):
     n_extracted = 0
     n_below_min = 0
     n_above_max = 0
+    # check for exact duplicates
+    vcf_ids = {}
+    lnum = 0
     
     with gzip.open(vcf, 'rt') as fh:
         cr = csv.reader(fh, delimiter='\t')
@@ -60,6 +63,9 @@ def extract_seqs(vcf, min_seqlen, max_seqlen):
             ref = ref[1:]
             if len(ref) >= min_seqlen and len(ref) <= max_seqlen:
                 n_extracted += 1
+                if vcf_id in vcf_ids:
+                    log_fatal("duplicate vcf_id " + vcf_id + " at line " + str(lnum))
+                vcf_ids[vcf_id] = True
                 print(">", vcf_id + " " + chrom + ":" + pos + " " + info)
                 print(ref)
             elif len(ref) < min_seqlen:
