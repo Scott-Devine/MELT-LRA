@@ -127,7 +127,7 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                     n_written += 1
                     # index
                     # TODO - could consider adding length and/or insertion sequence depending on our definition of "the same"
-                    key = ":".join([chrom, pos, strand])
+                    key = ":".join([chrom, pos, strand, iseq])
                     ind[key] = row
                     
     # print number of records in and out
@@ -135,7 +135,6 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
     info("in:" + ipath + "  out:" + opath + "  wrote: " + str(n_written) + " / " + str(n_read) + " (" + pct_written_str + "%)")
 
     return(sample_id, ind)
-
 
 # ------------------------------------------------------
 # count_MEs
@@ -173,6 +172,35 @@ def count_MEs(me_ind):
         'ME_subfamily': subfam_counts
     }
 
+# ------------------------------------------------------
+# find_unique_MEs
+# ------------------------------------------------------
+def find_unique_MEs(ME_inds):
+    sample_ids = sorted(ME_inds.keys())
+    
+    # map each ME to the samples in which it appears
+    unique_MEs = {}
+    
+    for sid in sample_ids:
+        s_ind = ME_inds[sid]
+        for key in s_ind:
+            if key not in unique_MEs:
+                unique_MEs[key] = []
+            unique_MEs[key].append(sid)
+
+    # sample count histogram
+    sc_hist = {}
+    for k in unique_MEs:
+        sc = len(unique_MEs[k])
+        if sc not in sc_hist:
+            sc_hist[sc] = 0
+        sc_hist[sc] += 1
+            
+    print("num unique ME(s) = " + str(len(unique_MEs)))
+    keys = [k for k in sc_hist.keys()]
+    for k in sorted(keys, key=lambda x: int(x), reverse=True):
+        print(str(k) + " : " + str(sc_hist[k]))
+    
 def list_to_dict(l):
     d = {}
     if l is not None:
@@ -190,13 +218,19 @@ def main():
     parser.add_argument('--csv_dir', required=True, help='Path to directory containing CSV files produced by find_MEs.py.')
     parser.add_argument('--output_dir', required=True, help='Path to directory where filtered output files should be written.')
     parser.add_argument('--output_suffix', required=False, default='filtered', help='Suffix to append to output files.')
+    # SVA filters
     parser.add_argument('--sva_excluded_repeat_types', required=False, help='Exclude/filter SVAs whose overlapping repeat type is in this list.')
+    # Alu filters
     parser.add_argument('--alu_excluded_repeat_types', required=False, help='Exclude/filter Alus whose overlapping repeat type is in this list.')
+    # LINE filters
     parser.add_argument('--line_excluded_repeat_types', required=False, help='Exclude/filter LINEs whose overlapping repeat type is in this list.')
+    # global filters
+    # TODO
     args = parser.parse_args()
 
-    csv_files = read_csv_dir(args.csv_dir)
-
+    # ------------------------------------------------------
+    # filters
+    # ------------------------------------------------------
     # excluded repeat types
     ex_sva_rep_types_d = list_to_dict(args.sva_excluded_repeat_types)
     ex_alu_rep_types_d = list_to_dict(args.alu_excluded_repeat_types)
@@ -209,6 +243,7 @@ def main():
     }
         
     # read, filter, and index csv_files
+    csv_files = read_csv_dir(args.csv_dir)
     sample_inds = {}
     for cf in csv_files:
         (sample_id, index) = filter_and_index_csv_file(args.csv_dir, args.output_dir, args.output_suffix, cf, filters)
@@ -220,7 +255,7 @@ def main():
     counts_file = "summary-counts-" + args.output_suffix + ".tsv"
     cpath = os.path.join(args.output_dir, counts_file)
 
-    # per-sample counts
+    # write per-sample counts
     sample_ids = sorted(sample_inds.keys())
     sample_counts = {}
 
@@ -228,8 +263,7 @@ def main():
         sample_counts[sid] = count_MEs(sample_inds[sid])
 
     with open(cpath, "wt") as cfh:
-
-        # different types of counts
+        # different count types
         for type in ('ME_type', 'ME_family', 'ME_subfamily'):
             # column headings
             counts_headers = [type]
@@ -253,7 +287,13 @@ def main():
                 cfh.write("\t".join(row) + "\n")
 
             cfh.write("\n\n")
-                
+
+    # ------------------------------------------------------
+    # combine samples
+    # ------------------------------------------------------
+    find_unique_MEs(sample_inds)
+    
+            
 if __name__ == '__main__':
     main()
 
