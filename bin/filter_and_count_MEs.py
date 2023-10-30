@@ -236,7 +236,7 @@ def find_unique_MEs(fh, ME_inds, output_dir):
             
             # loop over ref genome loci
             for k in mei_keys:
-                # group samples at this locus with the same sequence + genotype
+                # group samples at this locus by sequence then genotype
                 sg_groups = {}
                 for sid in me_sample_ids:
                     s_ind = ME_inds[sid]
@@ -246,17 +246,38 @@ def find_unique_MEs(fh, ME_inds, output_dir):
                      polyX_coords, ME_coords, insertion_coords, match_string,
                      ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
                      overlapping_annots, genotype, hap1_region, hap2_region) = mei
-                    key = iseq + ":" + genotype
-                    if key not in sg_groups:
-                        sg_groups[key] = { 'meis': [], 'samples': [], 'seq': iseq, 'genotype': genotype }
-                    sg_groups[key]['samples'].append(sid)
-                    sg_groups[key]['meis'].append(mei)
+
+                    if iseq not in sg_groups:
+                        sg_groups[iseq] = { 'gt' : {}, 'n_samples' : 0 }
+                    if genotype not in sg_groups[iseq]['gt']:
+                        sg_groups[iseq]['gt'][genotype] = { 'meis': [], 'samples': [], 'n_samples': 0, 'seq': iseq, 'genotype': genotype }
+
+                    sg_groups[iseq]['n_samples'] += 1
+                    sg_groups[iseq]['gt'][genotype]['samples'].append(sid)
+                    sg_groups[iseq]['gt'][genotype]['n_samples'] += 1
+                    sg_groups[iseq]['gt'][genotype]['meis'].append(mei)
 
                 # print sample groups
-                for key in sorted(sg_groups.keys(), key=lambda x: len(sg_groups[x]['samples']) , reverse = True):
-                    v = sg_groups[key]
-                    sstr = " ".join(v['samples']) + " [" + str(len(v['samples'])) + "]"
-                    ofh.write(sstr + "," + ",".join(v['meis'][0]) + "\n")  
+                for seq in sorted(sg_groups.keys(), key=lambda x: sg_groups[x]['n_samples'], reverse = True):
+                    sample_str = ""
+
+                    gtype_list = sorted(sg_groups[seq]['gt'].keys(), key = lambda x: sg_groups[seq]['gt'][x]['n_samples'], reverse = True)
+                    for gtype in gtype_list:
+                        v = sg_groups[seq]['gt'][gtype]
+                        samples = v['samples']
+                        sample_str += " ".join(samples) + " [" + gtype + "] "
+
+                    sample_str += " - " + str(sg_groups[seq]['n_samples']) + " sample(s)"
+
+                    # each unique sequence corresponds to an output row
+                    row = [c for c in v['meis'][0]]
+                    # set genotypes to a list, clear haplotype 1/2 info
+                    row[-1] = ''
+                    row[-2] = ''
+                    row[-3] = 'multiple' if len(gtype_list) > 1 else gtype_list[0]
+                    
+                    ofh.write(sample_str + "," + ",".join(row) + "\n")  
+
         # DEBUG
         sys.exit(1)
             
