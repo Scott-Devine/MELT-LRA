@@ -52,7 +52,9 @@ def add_csv_file(js_fh, dpath, file):
 
     m = re.match(r'^(\S+)-PAV.*$', file)
     if not m:
-        fatal("Failed to parse sample id from filename " + file)
+        warn("failed to parse sample id from filename " + file)
+        m = re.match(r'^(.*).csv$', file)
+        
     sample_id = m.group(1)
     info("sample = " + sample_id)
     sample_id = re.sub(r'[\s\-]', '_', sample_id)
@@ -67,7 +69,7 @@ def add_csv_file(js_fh, dpath, file):
             encoded_data += line.strip()
         
     # insert encoded data into output JS file
-    var_name = re.sub(r'[\.\-\s]', '_', file) 
+    var_name = "x" + re.sub(r'[\.\-\s]', '_', file) 
     
     js_fh.write("// " + sample_id + "\n")
     js_fh.write("const " + var_name + " = `" + encoded_data + "`;\n\n")
