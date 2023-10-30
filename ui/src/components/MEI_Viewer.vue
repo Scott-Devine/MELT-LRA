@@ -12,6 +12,7 @@ const props = defineProps({
 const pct_format = format(".1f")
 
 const headers = [
+{ text: 'samples', value: 'samples', sortable: true, fixed: true, width: 300 },
 { text: 'chrom', value: 'chrom', sortable: true, fixed: true, width: 80 },
 { text: 'pos', value: 'pos', sortable: true, fixed: true, width: 100 },
 { text: 'strand', value: 'strand', sortable: true, fixed: true, width: 80 },
@@ -41,7 +42,7 @@ const sortBy = []
 const sortType = []
 const me_types = ['ALU', 'LINE1', 'SVA']
 const me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
-const genotypes = ['1|1','1|0','0|1','1|.','.|1']
+const genotypes = ['1|1','1|0','0|1','1|.','.|1','multiple']
 
 const state = reactive({
     meis: [],
@@ -485,19 +486,21 @@ state.meis = props.meis
                     <div class="px-2">
                         <MEI :key="item.key" :mei="item" />
                         <div class="text-h6">
-                            <div class="tsd_div pa-1 my-1 font-weight-bold">TSD</div> {{ item.TSD_seq }}<br>
+                            <div class="hap_div pa-1 my-1 font-weight-bold">genotype</div> {{ item.genotype }} 
+                            <div class="tsd_div pa-1 my-1 ml-3 font-weight-bold">TSD</div> {{ item.TSD_seq }}
+
+                            <div v-if="item.overlapping_annots.length > 0" class="repeat_div ml-3 pa-1 my-1 mr-2 font-weight-bold">overlapping hg38 repeats</div>
+                            <span v-for="(annot, anum) in item.overlapping_annots">{{ annot }}</span>
+                            <br>
+                          
                             <span v-if="item.ME == 'ALU' || item.ME == 'LINE1'">
                                 <div class="calu_div pa-1 my-1 font-weight-bold">{{ item.ME == 'ALU' ? 'CALU' : 'LINEU'}}</div> 
-                                {{item.ME_family}} {{item.ME_subfamily}} {{item.ME_start}}-{{item.ME_stop}} diag_matches={{item.ME_num_diag_matches}} num_diffs={{ item.ME_num_diffs }}  diffs={{ item.ME_diffs }}<br>
+                                {{item.ME_family}} {{item.ME_subfamily}} {{item.ME_start}}-{{item.ME_stop}} diag_matches={{item.ME_num_diag_matches}} num_diffs={{ item.ME_num_diffs }}  diffs={{ item.ME_diffs }}
                             </span>
-                            <div v-if="item.overlapping_annots.length">
-                                <div v-if="item.overlapping_annots.length > 0" class="repeat_div pa-1 my-1 mr-2 font-weight-bold">overlapping hg38 repeats</div>
-                                <span v-for="(annot, anum) in item.overlapping_annots">{{ annot }}</span>
-                                <br>
-                            </div>
-                            <div class="hap_div pa-1 my-1 font-weight-bold">genotype</div> {{ item.genotype }}<br>
-                            <div class="hap1_div pa-1 my-1 font-weight-bold">haplotype region 1</div> {{ item.hap1_region }}<br>
-                            <div class="hap2_div pa-1 my-1 font-weight-bold">haplotype region 2</div> {{ item.hap2_region }}<br>
+
+
+                            <div v-if="(item.hap1_region != '') || (item.hap2_region != '')" class="hap1_div pa-1 ml-3 my-1 font-weight-bold">haplotype region 1</div> {{ item.hap1_region }} 
+                            <div v-if="(item.hap1_region != '') || (item.hap2_region != '')" class="hap2_div pa-1 ml-3 my-1 font-weight-bold">haplotype region 2</div> {{ item.hap2_region }}<br>
 
                         </div>
                     </div>
