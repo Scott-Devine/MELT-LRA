@@ -15,6 +15,7 @@ import sys
 # ------------------------------------------------------
 CSV_FILE_RE = r'^(.*)\.csv'
 CSV_SAMPLE_ID_RE = r'^(.*)-PAV-MEs.*$'
+CSV_HEADER = None
 
 DEBUG = False
 
@@ -52,7 +53,9 @@ def read_csv_dir(dpath):
 # ------------------------------------------------------
 # filter_and_index_csv_file
 # ------------------------------------------------------
-def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters):
+def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters, unique_seq):
+    global CSV_HEADER
+    
     # sample index
     ind = {}
     
@@ -90,6 +93,9 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                 
                 # header line
                 if chrom == 'chrom':
+                    if CSV_HEADER is None:
+                        CSV_HEADER = ['samples']
+                        CSV_HEADER.extend(row)
                     ofh.write(",".join(row) + "\n")
                     continue
 
@@ -125,9 +131,12 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                 if not filter:
                     ofh.write(",".join(row) + "\n")
                     n_written += 1
-                    # index
-                    # TODO - could consider adding length and/or insertion sequence depending on our definition of "the same"
-                    key = ":".join([chrom, pos, strand, iseq])
+                    # index by location
+                    kc = [chrom, pos, strand]
+                    # and insertion sequence, if requested
+                    if unique_seq:
+                        kc.append(iseq)
+                    key = ":".join(kc)
                     ind[key] = row
                     
     # print number of records in and out
@@ -175,7 +184,7 @@ def count_MEs(me_ind):
 # ------------------------------------------------------
 # find_unique_MEs
 # ------------------------------------------------------
-def find_unique_MEs(ME_inds):
+def find_unique_MEs(fh, ME_inds, output_dir):
     sample_ids = sorted(ME_inds.keys())
     
     # map each ME to the samples in which it appears
@@ -188,19 +197,69 @@ def find_unique_MEs(ME_inds):
                 unique_MEs[key] = []
             unique_MEs[key].append(sid)
 
-    # sample count histogram
+    # write sample count histogram to counts file
     sc_hist = {}
     for k in unique_MEs:
         sc = len(unique_MEs[k])
         if sc not in sc_hist:
             sc_hist[sc] = 0
         sc_hist[sc] += 1
-            
-    print("num unique ME(s) = " + str(len(unique_MEs)))
+
+    fh.write("\t".join(["num_samples", "num_MEIs"]) + "\n")
     keys = [k for k in sc_hist.keys()]
     for k in sorted(keys, key=lambda x: int(x), reverse=True):
-        print(str(k) + " : " + str(sc_hist[k]))
-    
+        fh.write("\t".join([str(k), str(sc_hist[k])]) + "\n")
+    fh.write("\t".join(['total', str(len(unique_MEs))]) + "\n")
+
+    # generate MEI CSV files, one for each sample signature
+    sample_sig_to_meis = {}
+    for k in unique_MEs:
+        me_sample_ids = sorted(unique_MEs[k])
+        ssig = "_".join(me_sample_ids)
+        if ssig not in sample_sig_to_meis:
+            sample_sig_to_meis[ssig] = []
+        sample_sig_to_meis[ssig].append(k)
+
+    for ssig in sample_sig_to_meis:
+        mei_keys = sample_sig_to_meis[ssig]
+        print("sample sig = " + str(ssig) + " meis= " + str(mei_keys))
+        me_sample_ids = ssig.split("_")
+        n_samples = len(me_sample_ids)
+        # DEBUG
+        if n_samples < 39:
+            continue
+        info("writing MEIs for sample sig " + ssig)
+        ofile = str(n_samples) + "-samples.csv"
+        opath = os.path.join(output_dir, ofile)
+        with open(opath, "wt") as ofh:
+            ofh.write(",".join(CSV_HEADER) + "\n")
+            
+            # loop over ref genome loci
+            for k in mei_keys:
+                # group samples at this locus with the same sequence + genotype
+                sg_groups = {}
+                for sid in me_sample_ids:
+                    s_ind = ME_inds[sid]
+                    mei = s_ind[k]
+                    (chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+                     left_flank_seq, right_flank_seq, TSD_seq,
+                     polyX_coords, ME_coords, insertion_coords, match_string,
+                     ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
+                     overlapping_annots, genotype, hap1_region, hap2_region) = mei
+                    key = iseq + ":" + genotype
+                    if key not in sg_groups:
+                        sg_groups[key] = { 'meis': [], 'samples': [], 'seq': iseq, 'genotype': genotype }
+                    sg_groups[key]['samples'].append(sid)
+                    sg_groups[key]['meis'].append(mei)
+
+                # print sample groups
+                for key in sorted(sg_groups.keys(), key=lambda x: len(sg_groups[x]['samples']) , reverse = True):
+                    v = sg_groups[key]
+                    sstr = " ".join(v['samples']) + " [" + str(len(v['samples'])) + "]"
+                    ofh.write(sstr + "," + ",".join(v['meis'][0]) + "\n")  
+        # DEBUG
+        sys.exit(1)
+            
 def list_to_dict(l):
     d = {}
     if l is not None:
@@ -218,6 +277,7 @@ def main():
     parser.add_argument('--csv_dir', required=True, help='Path to directory containing CSV files produced by find_MEs.py.')
     parser.add_argument('--output_dir', required=True, help='Path to directory where filtered output files should be written.')
     parser.add_argument('--output_suffix', required=False, default='filtered', help='Suffix to append to output files.')
+    parser.add_argument('--require_unique_sequence', required=False, action=argparse.BooleanOptionalAction, help='Whether to require unique sequence when merging MEIs.')
     # SVA filters
     parser.add_argument('--sva_excluded_repeat_types', required=False, help='Exclude/filter SVAs whose overlapping repeat type is in this list.')
     # Alu filters
@@ -246,13 +306,13 @@ def main():
     csv_files = read_csv_dir(args.csv_dir)
     sample_inds = {}
     for cf in csv_files:
-        (sample_id, index) = filter_and_index_csv_file(args.csv_dir, args.output_dir, args.output_suffix, cf, filters)
+        (sample_id, index) = filter_and_index_csv_file(args.csv_dir, args.output_dir, args.output_suffix, cf, filters, args.require_unique_sequence)
         sample_inds[sample_id] = index
 
     # ------------------------------------------------------
     # write summary/counts file
     # ------------------------------------------------------
-    counts_file = "summary-counts-" + args.output_suffix + ".tsv"
+    counts_file = "summary-counts.tsv"
     cpath = os.path.join(args.output_dir, counts_file)
 
     # write per-sample counts
@@ -288,10 +348,10 @@ def main():
 
             cfh.write("\n\n")
 
-    # ------------------------------------------------------
-    # combine samples
-    # ------------------------------------------------------
-    find_unique_MEs(sample_inds)
+        # ------------------------------------------------------
+        # combine samples
+        # ------------------------------------------------------
+        find_unique_MEs(cfh, sample_inds, args.output_dir)
     
             
 if __name__ == '__main__':
