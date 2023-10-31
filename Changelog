@@ -1,3 +1,7 @@
+v1.4.1 (?? 2023)
+ -Add sample/samples column to .csv file format and --sample option to find_MEs.py
+ -Add filter_and_count_MEs.py to generate summary statistics for a set of samples.
+
 v1.4.0 (October 24, 2023)
  -Remove --min_pctid_nogaps parameter; no longer needed due to #8.
  -Compute percent identity using only the portion of the alignment used in the coverage calculation. (#8)
