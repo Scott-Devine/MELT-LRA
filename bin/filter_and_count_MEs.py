@@ -53,7 +53,7 @@ def read_csv_dir(dpath):
 # ------------------------------------------------------
 # filter_and_index_csv_file
 # ------------------------------------------------------
-def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters, unique_seq):
+def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters, unique_seq, unique_calu):
     global CSV_HEADER
     
     # sample index
@@ -136,6 +136,9 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                     # and insertion sequence, if requested
                     if unique_seq:
                         kc.append(iseq)
+                    # and cALU/LINEu calls
+                    if unique_calu:
+                        kc.append(ME_subfamily + ":" + ME_diffs)
                     key = ":".join(kc)
                     ind[key] = row
                     
@@ -211,7 +214,7 @@ def find_unique_MEs(fh, ME_inds, output_dir):
         fh.write("\t".join([str(k), str(sc_hist[k])]) + "\n")
     fh.write("\t".join(['total', str(len(unique_MEs))]) + "\n")
 
-    # generate MEI CSV files, one for each sample signature
+    # generate MEI CSV files
     sample_sig_to_meis = {}
     for k in unique_MEs:
         me_sample_ids = sorted(unique_MEs[k])
@@ -220,19 +223,25 @@ def find_unique_MEs(fh, ME_inds, output_dir):
             sample_sig_to_meis[ssig] = []
         sample_sig_to_meis[ssig].append(k)
 
+    mei_files = {}
+        
     for ssig in sample_sig_to_meis:
         mei_keys = sample_sig_to_meis[ssig]
-        print("sample sig = " + str(ssig) + " meis= " + str(mei_keys))
         me_sample_ids = ssig.split("_")
         n_samples = len(me_sample_ids)
-        # DEBUG
-        if n_samples < 39:
-            continue
-        info("writing MEIs for sample sig " + ssig)
         ofile = str(n_samples) + "-samples.csv"
+        write_mode = "wt"
+        
+        if ofile in mei_files:
+            write_mode = "at"
+        else:
+            mei_files[ofile] = True
+            
         opath = os.path.join(output_dir, ofile)
-        with open(opath, "wt") as ofh:
-            ofh.write(",".join(CSV_HEADER) + "\n")
+        with open(opath, write_mode) as ofh:
+            # read header only once
+            if write_mode == "wt":
+                ofh.write(",".join(CSV_HEADER) + "\n")
             
             # loop over ref genome loci
             for k in mei_keys:
@@ -278,9 +287,6 @@ def find_unique_MEs(fh, ME_inds, output_dir):
                     
                     ofh.write(sample_str + "," + ",".join(row) + "\n")  
 
-        # DEBUG
-        sys.exit(1)
-            
 def list_to_dict(l):
     d = {}
     if l is not None:
@@ -299,6 +305,7 @@ def main():
     parser.add_argument('--output_dir', required=True, help='Path to directory where filtered output files should be written.')
     parser.add_argument('--output_suffix', required=False, default='filtered', help='Suffix to append to output files.')
     parser.add_argument('--require_unique_sequence', required=False, action=argparse.BooleanOptionalAction, help='Whether to require unique sequence when merging MEIs.')
+    parser.add_argument('--require_unique_calu_lineu', required=False, action=argparse.BooleanOptionalAction, help='Whether to require unique cALU/LINEu calls when merging MEIs.')
     # SVA filters
     parser.add_argument('--sva_excluded_repeat_types', required=False, help='Exclude/filter SVAs whose overlapping repeat type is in this list.')
     # Alu filters
@@ -327,7 +334,9 @@ def main():
     csv_files = read_csv_dir(args.csv_dir)
     sample_inds = {}
     for cf in csv_files:
-        (sample_id, index) = filter_and_index_csv_file(args.csv_dir, args.output_dir, args.output_suffix, cf, filters, args.require_unique_sequence)
+        unique_seq = args.require_unique_sequence
+        unique_calu = args.require_unique_calu_lineu
+        (sample_id, index) = filter_and_index_csv_file(args.csv_dir, args.output_dir, args.output_suffix, cf, filters, unique_seq, unique_calu)
         sample_inds[sample_id] = index
 
     # ------------------------------------------------------
