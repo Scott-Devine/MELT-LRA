@@ -125,6 +125,15 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                     if oa_rep_fam in rtypes:
                         filter = True
 
+                # min polyA/polyT length filter
+                min_polya = me_filters['min_polya']
+
+                pxc = [int(x) for x in polyX_coords.split('-')]
+                polyx_bp = pxc[1] - pxc[0] + 1 if (pxc[1] - pxc[0]) >= 0 else 0
+                
+                if polyx_bp <  min_polya:
+                    filter = True
+                        
                 # -------------------------------------------------
                 # write MEI to output file and add to index
                 # -------------------------------------------------
@@ -308,10 +317,13 @@ def main():
     parser.add_argument('--require_unique_calu_lineu', required=False, action=argparse.BooleanOptionalAction, help='Whether to require unique cALU/LINEu calls when merging MEIs.')
     # SVA filters
     parser.add_argument('--sva_excluded_repeat_types', required=False, help='Exclude/filter SVAs whose overlapping repeat type is in this list.')
+    parser.add_argument('--sva_min_polyA_bp', required=False, default=0, help='Minimum SVA polyA/polyT length.')
     # Alu filters
     parser.add_argument('--alu_excluded_repeat_types', required=False, help='Exclude/filter Alus whose overlapping repeat type is in this list.')
+    parser.add_argument('--alu_min_polyA_bp', required=False, default=0, help='Minimum Alu polyA/polyT length.')
     # LINE filters
     parser.add_argument('--line_excluded_repeat_types', required=False, help='Exclude/filter LINEs whose overlapping repeat type is in this list.')
+    parser.add_argument('--line_min_polyA_bp', required=False, default=0, help='Minimum LINE polyA/polyT length.')
     # global filters
     # TODO
     args = parser.parse_args()
@@ -324,10 +336,15 @@ def main():
     ex_alu_rep_types_d = list_to_dict(args.alu_excluded_repeat_types)
     ex_line_rep_types_d = list_to_dict(args.line_excluded_repeat_types)
 
+    # min polyA length
+    sva_min_polya = int(args.sva_min_polyA_bp)
+    alu_min_polya = int(args.alu_min_polyA_bp)
+    line_min_polya = int(args.line_min_polyA_bp)
+    
     filters = {
-        'SVA': { 'repeat_types': ex_sva_rep_types_d },
-        'ALU' : { 'repeat_types': ex_alu_rep_types_d },
-        'LINE1': { 'repeat_types': ex_line_rep_types_d }
+        'SVA': { 'repeat_types': ex_sva_rep_types_d, 'min_polya': sva_min_polya },
+        'ALU' : { 'repeat_types': ex_alu_rep_types_d, 'min_polya': alu_min_polya },
+        'LINE1': { 'repeat_types': ex_line_rep_types_d, 'min_polya': line_min_polya }
     }
         
     # read, filter, and index csv_files
