@@ -66,7 +66,7 @@ const state = reactive({
     selected_overlapping_rep_counts: {},
     headers: headers,
     pctid_range: [0.0, 100.0],
-    min_pctcov: 40.0,
+    ins_pctcov_range: [0.0, 100.0],
     me_pctcov_range: [0.0, 100.0],
     me_ins_length_range: [0.0, 7000.0],
     tsd_length_range: [0.0, 3000.0],
@@ -81,7 +81,8 @@ function reset_filters() {
     state.selected_genotypes = genotypes
     state.pctid_range[0] = 0.0
     state.pctid_range[1] = 100.0
-    state.min_pctcov = 40.0
+    state.ins_pctcov_range[0] = 0.0
+    state.ins_pctcov_range[1] = 100.0
     state.me_pctcov_range[0] = 0.0
     state.me_pctcov_range[1] = 100.0
     state.me_ins_length_range[0] = 0.0
@@ -146,8 +147,8 @@ function update_selected_meis() {
     })
 
     state.meis.forEach(m => {
-        if ((m['%cov'] >= state.min_pctcov)
-        && (m['%id'] >= state.pctid_range[0]) && (m['%id'] <= state.pctid_range[1])
+        if ((m['%id'] >= state.pctid_range[0]) && (m['%id'] <= state.pctid_range[1])
+        && (m['%cov'] >= state.ins_pctcov_range[0]) && (m['%cov'] <= state.ins_pctcov_range[1])
         && (m['%ME'] >= state.me_pctcov_range[0]) && (m['%ME'] <= state.me_pctcov_range[1])
         && (m['insertion_size'] >= state.me_ins_length_range[0]) && (m['insertion_size'] <= state.me_ins_length_range[1])
         && (m['TSD_length'] >= state.tsd_length_range[0]) && (m['TSD_length'] <= state.tsd_length_range[1])
@@ -210,7 +211,7 @@ function load_new_data() {
 
 watch(() => props.meis, (newValue) => { state.meis = newValue })
 watch(() => state.pctid_range, (newValue) => { update_selected_meis() })
-watch(() => state.min_pctcov, (newValue) => { update_selected_meis() })
+watch(() => state.ins_pctcov_range, (newValue) => { update_selected_meis() })
 watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
 watch(() => state.me_ins_length_range, (newValue) => { update_selected_meis() })
 watch(() => state.tsd_length_range, (newValue) => { update_selected_meis() })
@@ -355,16 +356,16 @@ state.meis = props.meis
                                         {{ state.pctid_range[0] }}% - {{ state.pctid_range[1] }}%
                                     </v-col>
                                 </v-row>
-                                
+
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="2" class="pa-0 ma-0">
-                                        Min insertion %coverage:
+                                        Insertion %coverage range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
-                                        <v-slider v-model="state.min_pctcov" :min="40" :max="100" :step="1" thumb-label hide-details></v-slider>
+                                        <v-range-slider v-model="state.ins_pctcov_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
                                     <v-col cols="2" class="pa-0 ma-0 pl-3">
-                                        {{ state.min_pctcov }}%
+                                        {{ state.ins_pctcov_range[0] }}% - {{ state.ins_pctcov_range[1] }}%
                                     </v-col>
                                 </v-row>
                                 
