@@ -85,12 +85,12 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
             for row in cr:
                 lnum += 1
 
-                (chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+                (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
                  left_flank_seq, right_flank_seq, TSD_seq,
                  polyX_coords, ME_coords, insertion_coords, match_string,
                  ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
                  overlapping_annots, genotype, hap1_region, hap2_region) = row
-                
+
                 # header line
                 if chrom == 'chrom':
                     if CSV_HEADER is None:
@@ -101,6 +101,12 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
 
                 # MEI line
                 n_read += 1
+
+                pct_id = re.sub('%$', '', pct_id)
+                pct_id = float(pct_id)
+
+                pct_cov = re.sub('%$', '', pct_cov)
+                pct_cov = float(pct_cov)
 
                 # -------------------------------------------------
                 # apply ME-specific filters
@@ -133,7 +139,17 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                 
                 if polyx_bp <  min_polya:
                     filter = True
-                        
+
+                # min_pctcov filter
+                min_pctcov = me_filters['min_pctcov']
+                if pct_cov < min_pctcov:
+                    filter = True
+                
+                # min_pctid filter
+                min_pctid = me_filters['min_pctid']
+                if pct_id < min_pctid:
+                    filter = True
+                    
                 # -------------------------------------------------
                 # write MEI to output file and add to index
                 # -------------------------------------------------
@@ -172,7 +188,7 @@ def count_MEs(me_ind):
     
     for key in me_ind:
         me = me_ind[key]
-        (chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+        (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
          left_flank_seq, right_flank_seq, TSD_seq,
          polyX_coords, ME_coords, insertion_coords, match_string,
          ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
@@ -196,7 +212,7 @@ def count_MEs(me_ind):
 # ------------------------------------------------------
 # find_unique_MEs
 # ------------------------------------------------------
-def find_unique_MEs(fh, ME_inds, output_dir):
+def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
     sample_ids = sorted(ME_inds.keys())
     
     # map each ME to the samples in which it appears
@@ -238,7 +254,7 @@ def find_unique_MEs(fh, ME_inds, output_dir):
         mei_keys = sample_sig_to_meis[ssig]
         me_sample_ids = ssig.split("_")
         n_samples = len(me_sample_ids)
-        ofile = str(n_samples) + "-samples.csv"
+        ofile = str(n_samples) + "-samples-" + output_suffix + ".csv"
         write_mode = "wt"
         
         if ofile in mei_files:
@@ -259,7 +275,7 @@ def find_unique_MEs(fh, ME_inds, output_dir):
                 for sid in me_sample_ids:
                     s_ind = ME_inds[sid]
                     mei = s_ind[k]
-                    (chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+                    (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
                      left_flank_seq, right_flank_seq, TSD_seq,
                      polyX_coords, ME_coords, insertion_coords, match_string,
                      ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
@@ -315,15 +331,25 @@ def main():
     parser.add_argument('--output_suffix', required=False, default='filtered', help='Suffix to append to output files.')
     parser.add_argument('--require_unique_sequence', required=False, action=argparse.BooleanOptionalAction, help='Whether to require unique sequence when merging MEIs.')
     parser.add_argument('--require_unique_calu_lineu', required=False, action=argparse.BooleanOptionalAction, help='Whether to require unique cALU/LINEu calls when merging MEIs.')
+
     # SVA filters
     parser.add_argument('--sva_excluded_repeat_types', required=False, help='Exclude/filter SVAs whose overlapping repeat type is in this list.')
     parser.add_argument('--sva_min_polyA_bp', required=False, default=0, help='Minimum SVA polyA/polyT length.')
+    parser.add_argument('--sva_min_pctid', required=False, default=0, help='Minimum SVA average percent identity of aligned regions.')
+    parser.add_argument('--sva_min_pctcov', required=False, default=0, help='Minimum SVA percent coverage of insertion minus TSD and polyX by aligned regions.')
+
     # Alu filters
     parser.add_argument('--alu_excluded_repeat_types', required=False, help='Exclude/filter Alus whose overlapping repeat type is in this list.')
     parser.add_argument('--alu_min_polyA_bp', required=False, default=0, help='Minimum Alu polyA/polyT length.')
+    parser.add_argument('--alu_min_pctid', required=False, default=0, help='Minimum Alu average percent identity of aligned regions.')
+    parser.add_argument('--alu_min_pctcov', required=False, default=0, help='Minimum Alu percent coverage of insertion minus TSD and polyX by aligned regions.')
+
     # LINE filters
     parser.add_argument('--line_excluded_repeat_types', required=False, help='Exclude/filter LINEs whose overlapping repeat type is in this list.')
     parser.add_argument('--line_min_polyA_bp', required=False, default=0, help='Minimum LINE polyA/polyT length.')
+    parser.add_argument('--line_min_pctid', required=False, default=0, help='Minimum LINE average percent identity of aligned regions.')
+    parser.add_argument('--line_min_pctcov', required=False, default=0, help='Minimum LINE percent coverage of insertion minus TSD and polyX by aligned regions.')
+
     # global filters
     # TODO
     args = parser.parse_args()
@@ -337,14 +363,36 @@ def main():
     ex_line_rep_types_d = list_to_dict(args.line_excluded_repeat_types)
 
     # min polyA length
-    sva_min_polya = int(args.sva_min_polyA_bp)
-    alu_min_polya = int(args.alu_min_polyA_bp)
-    line_min_polya = int(args.line_min_polyA_bp)
+    sva_min_polya = float(args.sva_min_polyA_bp)
+    alu_min_polya = float(args.alu_min_polyA_bp)
+    line_min_polya = float(args.line_min_polyA_bp)
+
+    # min_pctcov
+    sva_min_pctcov = float(args.sva_min_pctcov)
+    alu_min_pctcov = float(args.alu_min_pctcov)
+    line_min_pctcov = float(args.line_min_pctcov)
+
+    # min_pctid
+    sva_min_pctid = float(args.sva_min_pctid)
+    alu_min_pctid = float(args.alu_min_pctid)
+    line_min_pctid = float(args.line_min_pctid)
     
     filters = {
-        'SVA': { 'repeat_types': ex_sva_rep_types_d, 'min_polya': sva_min_polya },
-        'ALU' : { 'repeat_types': ex_alu_rep_types_d, 'min_polya': alu_min_polya },
-        'LINE1': { 'repeat_types': ex_line_rep_types_d, 'min_polya': line_min_polya }
+        'SVA': { 'repeat_types': ex_sva_rep_types_d,
+                 'min_polya': sva_min_polya,
+                 'min_pctcov': sva_min_pctcov,
+                 'min_pctid': sva_min_pctid
+                },
+        'ALU' : { 'repeat_types': ex_alu_rep_types_d,
+                  'min_polya': alu_min_polya,
+                  'min_pctcov': alu_min_pctcov,
+                  'min_pctid': alu_min_pctid
+                 },
+        'LINE1': { 'repeat_types': ex_line_rep_types_d,
+                   'min_polya': line_min_polya,
+                   'min_pctcov': line_min_pctcov,
+                   'min_pctid': line_min_pctid
+                  }
     }
         
     # read, filter, and index csv_files
@@ -359,7 +407,7 @@ def main():
     # ------------------------------------------------------
     # write summary/counts file
     # ------------------------------------------------------
-    counts_file = "summary-counts.tsv"
+    counts_file = "summary-counts-" + args.output_suffix + ".tsv"
     cpath = os.path.join(args.output_dir, counts_file)
 
     # write per-sample counts
@@ -398,7 +446,7 @@ def main():
         # ------------------------------------------------------
         # combine samples
         # ------------------------------------------------------
-        find_unique_MEs(cfh, sample_inds, args.output_dir)
+        find_unique_MEs(cfh, sample_inds, args.output_dir, args.output_suffix)
     
             
 if __name__ == '__main__':
