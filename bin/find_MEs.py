@@ -35,7 +35,7 @@ ME_LENGTHS = {
 }
 
 # CSV output
-CSV_HEADERS = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
+CSV_HEADERS = ['samples', 'chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'match_string',
                'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs', 'overlapping_annots', 'genotype', 'hap1_region', 'hap2_region']
 CSV_FLANKING_SEQ_BP = 30
 
@@ -1143,6 +1143,7 @@ def main():
     # input
     parser = argparse.ArgumentParser(description='Identify MEIs in a PAV-generated VCF file of sequence variants.')
     parser.add_argument('--vcf', required=True, help='Path to VCF file containing contigs to check.')
+    parser.add_argument('--sample', required=True, help='Sample ID.')
     parser.add_argument('--fasta_dir', required=True, help='Path to directory that contains FASTA reference files.')
     parser.add_argument('--alu_water', required=True, help='Path to ALU water alignment output file.')
     parser.add_argument('--alu_water_rev', required=True, help='Path to ALU water reverse strand alignment output file.')
@@ -1334,6 +1335,7 @@ def main():
         mei['overlapping_annots'] = ""
         annots = get_overlapping_annotation(annots_by_chrom, mei['chrom'], int(mei['pos']), int(mei['pos']) + 1)
         mei['overlapping_annots'] = "|".join([":".join([a[5], a[6], a[7], a[9], a[10], a[11], a[12], a[13]])  for a in annots])
+        mei['sample'] = args.sample
         
     # CSV output
     csv_fh = None
@@ -1344,7 +1346,8 @@ def main():
         csv_fh.write(",".join(CSV_HEADERS) + "\n")
     
         # fields for CSV output
-        csv_fields = ['chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%cov', 'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
+        csv_fields = ['sample', 'chrom', 'pos', 'strand', 'ME', '%ME', '%id', '%cov',
+                      'insertion_seq', 'left_flank_seq', 'right_flank_seq', 'TSD_seq', 'polyX_coords', 'ME_coords', 'insertion_coords', 'alignment',
                       # MELT CALU/LINEU
                       'ME_family', 'ME_subfamily', 'ME_start', 'ME_stop', 'ME_num_diag_matches', 'ME_num_diffs', 'ME_diffs',
                       # annotations
