@@ -312,6 +312,50 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
                     
                     ofh.write(sample_str + "," + ",".join(row) + "\n")  
 
+def print_unique_MEs_by_type(fh, ME_inds):
+    sample_ids = sorted(ME_inds.keys())
+    
+    # map each ME to the samples in which it appears
+    unique_MEs = {}
+    
+    for sid in sample_ids:
+        s_ind = ME_inds[sid]
+        for key in s_ind:
+            if key not in unique_MEs:
+                unique_MEs[key] = []
+            unique_MEs[key].append(sid)
+
+    # sample count histograms by type
+    type_sc_hists = {}
+    for k in unique_MEs:
+        sids = unique_MEs[k]
+        s_ind = ME_inds[sids[0]]
+        mei = s_ind[k]
+        (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+         left_flank_seq, right_flank_seq, TSD_seq,
+         polyX_coords, ME_coords, insertion_coords, match_string,
+         ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
+         overlapping_annots, genotype, hap1_region, hap2_region) = mei
+        if ME not in type_sc_hists:
+            type_sc_hists[ME] = {}
+
+        sc = len(sids)
+        
+        if sc not in type_sc_hists[ME]:
+            type_sc_hists[ME][sc] = 0
+        type_sc_hists[ME][sc] += 1
+
+
+    for type in type_sc_hists.keys():
+        total = 0
+        fh.write("\n\n" + type + "\n")
+        fh.write("\t".join(["num_samples", "num_MEIs"]) + "\n")
+        keys = [k for k in type_sc_hists[type].keys()]
+        for k in sorted(keys, key=lambda x: int(x), reverse=True):
+            fh.write("\t".join([str(k), str(type_sc_hists[type][k])]) + "\n")
+            total += type_sc_hists[type][k]
+        fh.write("\t".join(['total', str(total) + "\n"]))
+
 def list_to_dict(l):
     d = {}
     if l is not None:
@@ -447,7 +491,9 @@ def main():
         # combine samples
         # ------------------------------------------------------
         find_unique_MEs(cfh, sample_inds, args.output_dir, args.output_suffix)
-    
+
+        print_unique_MEs_by_type(cfh, sample_inds)
+
             
 if __name__ == '__main__':
     main()
