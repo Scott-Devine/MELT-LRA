@@ -163,7 +163,11 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                         kc.append(iseq)
                     # and cALU/LINEu calls
                     if unique_calu:
-                        kc.append(ME_subfamily + ":" + ME_diffs)
+                        # use sequence for SVAs - no cALU/LINEu output
+                        if ME == 'SVA':
+                            kc.append(iseq)
+                        else:
+                            kc.append(ME_subfamily + ":" + ME_diffs)
                     key = ":".join(kc)
                     ind[key] = row
                     
@@ -467,6 +471,7 @@ def main():
             # column headings
             counts_headers = [type]
             counts_headers.extend(sample_ids)
+            counts_headers.append("Average")
             cfh.write("\t".join(counts_headers) + "\n")
 
             # take union of keys over all samples
@@ -479,10 +484,19 @@ def main():
                     
             for k in sorted_keys:
                 row = [k]
+                sum = 0
+
                 for sid in sample_ids:
                     sc = sample_counts[sid][type]
                     ct = sc[k] if k in sc else 0
                     row.append(str(ct))
+                    sum += ct
+
+                # add average
+                n_samples = len(sample_ids)
+                avg = "%.1f" % (sum / n_samples)
+                row.append(avg)
+
                 cfh.write("\t".join(row) + "\n")
 
             cfh.write("\n\n")
