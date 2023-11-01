@@ -1269,7 +1269,7 @@ def main():
             me_match = sorted_matches[0]
             # kick the can down the road
             if n_matches > 1 and sorted_matches[0]['alignment']['score'] == sorted_matches[1]['alignment']['score']:
-                fatal("multiple qualifying matches with the same score: " + str(sorted_matches))
+                warn("multiple qualifying matches with the same score: " + str(sorted_matches))
 
         # check for possible 5' inversions - do any matches qualify if both strands are combined?
         elif False:
