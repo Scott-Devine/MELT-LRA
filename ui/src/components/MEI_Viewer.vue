@@ -224,6 +224,9 @@ watch(() => state.selected_genotypes, (newValue) => { update_selected_meis() })
 watch(() => state.meis, (newValue) => { load_new_data() })
 
 function formatRatio(n1,n2) {
+    if (!n2) {
+      return String(n1) + "/0";
+    }
     return String(n1).padStart(String(n2).length, " ") + "/" + n2 + " (" + pct_format((n1/n2) * 100.0) + "%)";
 }
 
