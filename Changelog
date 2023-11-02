@@ -1,6 +1,7 @@
-v1.4.1 (?? 2023)
+v1.4.1 (November 2, 2023)
+ -Update MEI viewer to accommodate output from filter_and_count_MEs.py
  -Add sample/samples column to .csv file format and --sample option to find_MEs.py
- -Add filter_and_count_MEs.py to generate summary statistics for a set of samples.
+ -Add filter_and_count_MEs.py to filter and merge MEIS and generate summary statistics for a set of samples.
 
 v1.4.0 (October 24, 2023)
  -Remove --min_pctid_nogaps parameter; no longer needed due to #8.
