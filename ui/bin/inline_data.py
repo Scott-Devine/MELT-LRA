@@ -35,7 +35,7 @@ def warn(msg):
 def read_csv_dir(dpath):
     files = []
 
-    for file in os.listdir(dpath):
+    for file in sorted(os.listdir(dpath)):
         m = re.match(CSV_FILE_RE, file)
         if m:
             files.append(file)
