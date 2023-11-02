@@ -41,7 +41,7 @@ const currentPage = computed(() => dataTable.value?.currentPaginationNumber);
 const sortBy = []
 const sortType = []
 const me_types = ['ALU', 'LINE1', 'SVA']
-const me_families = ['AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
+const me_families = ['ALU', 'AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
 const genotypes = ['1|1','1|0','0|1','1|.','.|1','multiple']
 
 const state = reactive({
@@ -68,9 +68,9 @@ const state = reactive({
     pctid_range: [0.0, 100.0],
     ins_pctcov_range: [0.0, 100.0],
     me_pctcov_range: [0.0, 100.0],
-    me_ins_length_range: [0.0, 7000.0],
+    me_ins_length_range: [0.0, 20000.0],
     tsd_length_range: [0.0, 3000.0],
-    polyx_length_range: [0.0, 500.0],
+    polyx_length_range: [0.0, 2000.0],
     overlapping_repeats_range: [0.0, 10.0],
     display_mode: 'table'
 })
@@ -86,11 +86,11 @@ function reset_filters() {
     state.me_pctcov_range[0] = 0.0
     state.me_pctcov_range[1] = 100.0
     state.me_ins_length_range[0] = 0.0
-    state.me_ins_length_range[1] = 7000.0
+    state.me_ins_length_range[1] = 20000.0
     state.tsd_length_range[0] = 0.0
     state.tsd_length_range[1] = 3000.0
     state.polyx_length_range[0] = 0.0
-    state.polyx_length_range[1] = 500.0
+    state.polyx_length_range[1] = 2000.0
     state.overlapping_repeats_range[0] = 0.0
     state.overlapping_repeats_range[1] = 10.0
     state.display_mode = 'table'
@@ -341,7 +341,7 @@ state.meis = props.meis
                                         Insertion size range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
-                                        <v-range-slider v-model="state.me_ins_length_range" :min="0" :max="7000" :step="50" thumb-label hide-details></v-range-slider>
+                                        <v-range-slider v-model="state.me_ins_length_range" :min="0" :max="20000" :step="50" thumb-label hide-details></v-range-slider>
                                     </v-col>
                                     <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.me_ins_length_range[0] }}bp - {{ state.me_ins_length_range[1] }}bp
@@ -401,7 +401,7 @@ state.meis = props.meis
                                         polyA/T length range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
-                                        <v-range-slider v-model="state.polyx_length_range" :min="0" :max="500" :step="1" thumb-label hide-details></v-range-slider>
+                                        <v-range-slider v-model="state.polyx_length_range" :min="0" :max="2000" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
                                     <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         {{ state.polyx_length_range[0] }}bp - {{ state.polyx_length_range[1] }}bp
