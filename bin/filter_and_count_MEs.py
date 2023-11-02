@@ -94,7 +94,7 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                 # header line
                 if chrom == 'chrom':
                     if CSV_HEADER is None:
-                        CSV_HEADER = ['samples']
+                        CSV_HEADER = []
                         CSV_HEADER.extend(row)
                     ofh.write(",".join(row) + "\n")
                     continue
@@ -309,6 +309,9 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
 
                     # each unique sequence corresponds to an output row
                     row = [c for c in v['meis'][0]]
+                    # remove original sample in first column
+                    row.pop(0)
+                    
                     # set genotypes to a list, clear haplotype 1/2 info
                     row[-1] = ''
                     row[-2] = ''
