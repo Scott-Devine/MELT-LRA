@@ -14,7 +14,7 @@ import sys
 WATER_REGEX = r'^.*-water(-rev)?\.out$'
 SAMPLE_REGEX = r'^((HG|NA)\d+).*-water(-rev)?\.out$'
 FINAL_LINE_REGEX = r'^#---------------------------------------$'
-DEBUG = false
+DEBUG = False
 
 # ------------------------------------------------------
 # logging
@@ -50,7 +50,7 @@ def main():
 
     # read water files in directory
     wfiles = [f for f in os.listdir(args.water_dir) if re.match(WATER_REGEX, f)]
-    print("files = " + str(wfiles))
+    debug("files = " + str(wfiles))
 
     sample_files = {}
 
@@ -68,11 +68,12 @@ def main():
             sample_files[sample] = []
         sample_files[sample].append(wpath)
 
+    info("num_samples: " + str(len(sample_files)))
     n_files_per_sample = None
-        
+    
     for sample in sample_files:
         n_files = len(sample_files[sample])
-        print(sample + ": " + str(n_files) + " files")
+        info(sample + ": " + str(n_files) + " files")
         if n_files_per_sample is None:
             n_files_per_sample = n_files
         elif files_per_sample != n_files:
@@ -109,7 +110,7 @@ def main():
         elif n_alignments != n_alignments_per_file:
             fatal("file " + wpath + " contains " + str(n_alignments) + " expected " + str(n_alignments_per_file))
 
-    print("all files contained " + str(n_alignments_per_file) + " alignment(s)")
+    info("num_alignments_per_file: " + str(n_alignments_per_file))
             
 if __name__ == '__main__':
     main()
