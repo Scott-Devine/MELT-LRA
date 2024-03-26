@@ -76,7 +76,7 @@ def main():
         info(sample + ": " + str(n_files) + " files")
         if n_files_per_sample is None:
             n_files_per_sample = n_files
-        elif files_per_sample != n_files:
+        elif n_files_per_sample != n_files:
             fatal("sample " + sample + " has " + str(n_files) + " output files, exepcted " + str(n_files_per_sample))
         
     # check that each contains the same number of alignments and ends cleanly
