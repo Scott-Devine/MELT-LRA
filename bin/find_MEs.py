@@ -200,10 +200,18 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
                 if gtype == '1':
                     hap_nums.append(hap_num)
                 hap_num += 1
-                    
+
+                # PAV 2.3.3 merged haplotype VCF:
+                #chr1	104160	chr1-104161-INS-8	A	AACACACAC	.	.	ID=chr1-104161-INS-8;SVTYPE=INS;SVLEN=8;TIG_REGION=haplotype1-0000013:67039367-67039374;QUERY_STRAND=-;HOM_REF=0,25;HOM_TIG=0,25	GT	1|.
+                
+                # PAV 2.4.0.1 unmerged VCF:
+                # chr1	104160	chr1-104161-INS-8	A	AACACACAC	.	PASS	ID=chr1-104161-INS-8;SVTYPE=INS;SVLEN=8;HAP=h1;COV_MEAN=1.0;COV_PROP=1.0;QRY_REGION=haplotype1-0000013:67039367-67039374;QRY_STRAND=-;CALL_SOURCE=CIGAR	GT	1
+
             # hap1_region, hap2_region
             hap_nums_ind = 0
-            tig_region = inf_d['TIG_REGION']
+            region_inf = 'TIG_REGION' if 'TIG_REGION' in inf_d else 'QRY_REGION'
+            
+            tig_region = inf_d[region_inf]
             regions = tig_region.split(',')
             for region in regions: 
                m = re.match(r'^([^:]+:\d+-\d+)$', region)
@@ -212,7 +220,7 @@ def read_vcf_insertions(vpath, ref_seqs, seqid, skip_seqids):
                    insertion["hap" + str(hap_nums[hap_nums_ind]) + "_region"] = hap_region
                    hap_nums_ind += 1
                else:
-                   fatal("unable to parse TIG_REGION " + region + " at line " + str(lnum))
+                   fatal("unable to parse " + region_inf + " " + region + " at line " + str(lnum))
 
             insertions.append(insertion)
             
