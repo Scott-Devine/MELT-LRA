@@ -42,7 +42,7 @@ const sortBy = []
 const sortType = []
 const me_types = ['ALU', 'LINE1', 'SVA']
 const me_families = ['ALU', 'AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
-const genotypes = ['1|1','1|0','0|1','1|.','.|1','multiple']
+const genotypes = ['1|1','1|0','0|1','1|.','.|1','multiple','1']
 
 const state = reactive({
     meis: [],
