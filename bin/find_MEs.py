@@ -975,10 +975,15 @@ def write_me_fasta_fwd(ins, fasta_fh):
 # ------------------------------------------------------
 # run_melt_calu_lineu
 # ------------------------------------------------------
-def run_melt_calu_lineu(MEIs_d, melt_jar, melt_exec, fasta_file_path):
+def run_melt_calu_lineu(MEIs_d, melt_jar, melt_exec, fasta):
     if not re.match(r'^(CALU|LINEU)$', melt_exec):
         fatal("Unsupported MELT executable - " + melt_exec)
-    melt_cmd = "java -jar " + melt_jar + " " + melt_exec + " -f " + fasta_file_path 
+
+    # no sequences to run
+    if fasta['n'] == 0:
+        return
+
+    melt_cmd = "java -jar " + melt_jar + " " + melt_exec + " -f " + fasta['path']
     melt_fh = os.popen(melt_cmd)
     reading = False
     
@@ -1019,7 +1024,7 @@ def run_melt_calu_lineu(MEIs_d, melt_jar, melt_exec, fasta_file_path):
 def ins_position_str(ins):
     return (ins['chrom'] + ":" + str(ins['pos'])).ljust(16)
 
-def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
+def add_insertion(ins, ref_seqs, alu_fasta, line_fasta):
     ref_seq = ref_seqs[ins['chrom']]
     ref_seq_len = ref_seq['len']
     ref_seq_pos = ins['pos']
@@ -1112,11 +1117,13 @@ def add_insertion(ins, ref_seqs, alu_fasta_fh, line_fasta_fh):
 
     # ALU/LINE1 FASTA output
     fasta_id = None
-    if (alu_fasta_fh is not None) and (ins['me_match']['ME'] == 'ALU'):
-        fasta_id = write_me_fasta_fwd(ins, alu_fasta_fh)
+    if (alu_fasta['fh'] is not None) and (ins['me_match']['ME'] == 'ALU'):
+        fasta_id = write_me_fasta_fwd(ins, alu_fasta['fh'])
+        alu_fasta['n'] = alu_fasta['n'] + 1
 
-    if (line_fasta_fh is not None) and (ins['me_match']['ME'] == 'LINE1'):
-        fasta_id = write_me_fasta_fwd(ins, line_fasta_fh)
+    if (line_fasta['fh'] is not None) and (ins['me_match']['ME'] == 'LINE1'):
+        fasta_id = write_me_fasta_fwd(ins, line_fasta['fh'])
+        line_fasta['n'] = line_fasta['n'] + 1
         
     l_flank = get_l_context_bp(CSV_FLANKING_SEQ_BP)
     r_flank = get_r_context_bp(CSV_FLANKING_SEQ_BP)
@@ -1223,14 +1230,16 @@ def main():
     info("read " + str(len(line_rev_aligns)) + " reverse strand LINE1 alignment(s) from " + args.line_water_rev)
 
     # FASTA output for CALU
-    alu_fasta_fh = open(args.alu_fasta, "w")
-    if alu_fasta_fh is None:
-        fatal("failed to open/write Alu FASTA file " + args.alu_fasta)
+    alu_fasta = { 'fh': None, 'n': 0, 'path': args.alu_fasta }
+    alu_fasta['fh'] = open(alu_fasta['path'], "w")
+    if alu_fasta['fh'] is None:
+        fatal("failed to open/write Alu FASTA file " + alu_fasta['path'])
     
     # FASTA output for LINEU
-    line_fasta_fh = open(args.line_fasta, "w")
-    if line_fasta_fh is None:
-        fatal("failed to open/write LINE1 FASTA file " + args.line_fasta)
+    line_fasta = { 'fh': None, 'n': 0, 'path': args.line_fasta }
+    line_fasta['fh'] = open(line_fasta['path'], "w")
+    if line_fasta['fh'] is None:
+        fatal("failed to open/write LINE1 FASTA file " + line_fasta['path'])
 
     # MEIs to print/report
     MEIs = []
@@ -1297,14 +1306,14 @@ def main():
             if inv_matches is not None:
                 # forward
                 vcf_ins['me_match'] = inv_matches[0]
-                ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta_fh, line_fasta_fh)
+                ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta, line_fasta)
                 MEIs.append(ins_d)
                 if 'fasta_id' in ins_d:
                     MEIs_d[ins_d['fasta_id']] = ins_d
 
                 # reverse
                 vcf_ins['me_match'] = inv_matches[1]
-                ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta_fh, line_fasta_fh)
+                ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta, line_fasta)
                 MEIs.append(ins_d)
                 if 'fasta_id' in ins_d:
                     MEIs_d[ins_d['fasta_id']] = ins_d
@@ -1319,19 +1328,19 @@ def main():
 
         # add insertions with ME match (but maybe no TSD)
         if me_match is not None:
-            ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta_fh, line_fasta_fh)
+            ins_d = add_insertion(vcf_ins, fasta_files, alu_fasta, line_fasta)
             MEIs.append(ins_d)
             if 'fasta_id' in ins_d:
                 MEIs_d[ins_d['fasta_id']] = ins_d
                 
     # close output files
-    for fh in (alu_fasta_fh, line_fasta_fh):
+    for fh in (f['fh'] for f in [alu_fasta, line_fasta]):
         if fh is not None:
             fh.close()
 
     # run CALU, LINEU 
-    run_melt_calu_lineu(MEIs_d, args.melt_jar, 'CALU', args.alu_fasta)
-    run_melt_calu_lineu(MEIs_d, args.melt_jar, 'LINEU', args.line_fasta)
+    run_melt_calu_lineu(MEIs_d, args.melt_jar, 'CALU', alu_fasta)
+    run_melt_calu_lineu(MEIs_d, args.melt_jar, 'LINEU', line_fasta)
     for mei in MEIs:
         if 'ME_family' not in mei:
             mei['ME_family'] = mei['ME']
