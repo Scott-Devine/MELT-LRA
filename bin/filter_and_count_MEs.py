@@ -270,7 +270,7 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
         opath = os.path.join(output_dir, ofile)
         with open(opath, write_mode) as ofh:
             # writer CSV header only once
-            if write_mode == "wt":
+            if write_mode == "w":
                 ofh.write(",".join(CSV_HEADER) + "\n")
             
             # loop over ref genome loci (plus cALU/LINEu and/or INS seq)
@@ -466,7 +466,7 @@ def main():
     for sid in sample_ids:
         sample_counts[sid] = count_MEs(sample_inds[sid])
 
-    with open(cpath, "wt") as cfh:
+    with open(cpath, "w") as cfh:
         # different count types
         for type in ('ME_type', 'ME_family', 'ME_subfamily'):
             # column headings
