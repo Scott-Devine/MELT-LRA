@@ -62,7 +62,7 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
     # parse sample_id from CSV filename
     m = re.match(CSV_SAMPLE_ID_RE, cfile)
     if not m:
-        fatal("couldn't parse sample_id from " + cfile + " with regex '" + CSV_SAMPLE_ID_RE + "'")
+        fatal("couldn't parse sample_id from " + cfile + " with regex '" + CSV_SAMPLE_ID_RE + "', setting sample_id=" + m.group(1))
     sample_id = m.group(1)
         
     ipath = os.path.join(csv_dir, cfile)
@@ -78,10 +78,10 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
     lnum = 0
     n_read = 0
     n_written = 0
-    with open(ipath, 'rt') as ifh:
+    with open(ipath, 'r') as ifh:
         cr = csv.reader(ifh, delimiter=',')
 
-        with open(opath, 'wt') as ofh:
+        with open(opath, 'w') as ofh:
             for row in cr:
                 lnum += 1
 
@@ -193,7 +193,7 @@ def count_MEs(me_ind):
     for key in me_ind:
         me = me_ind[key]
         (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
-         left_flank_seq, right_flank_seq, TSD_seq,
+          left_flank_seq, right_flank_seq, TSD_seq,
          polyX_coords, ME_coords, insertion_coords, match_string,
          ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
          overlapping_annots, genotype, hap1_region, hap2_region) = me
@@ -258,21 +258,22 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
         mei_keys = sample_sig_to_meis[ssig]
         me_sample_ids = ssig.split("_")
         n_samples = len(me_sample_ids)
+        # group together all signatures of the same size (i.e., number of samples)
         ofile = str(n_samples) + "-samples-" + output_suffix + ".csv"
-        write_mode = "wt"
+        write_mode = "w"
         
         if ofile in mei_files:
-            write_mode = "at"
+            write_mode = "a"
         else:
             mei_files[ofile] = True
             
         opath = os.path.join(output_dir, ofile)
         with open(opath, write_mode) as ofh:
-            # read header only once
+            # writer CSV header only once
             if write_mode == "wt":
                 ofh.write(",".join(CSV_HEADER) + "\n")
             
-            # loop over ref genome loci
+            # loop over ref genome loci (plus cALU/LINEu and/or INS seq)
             for k in mei_keys:
                 # group samples at this locus by sequence then genotype
                 sg_groups = {}
@@ -295,7 +296,7 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
                     sg_groups[iseq]['gt'][genotype]['n_samples'] += 1
                     sg_groups[iseq]['gt'][genotype]['meis'].append(mei)
 
-                # print sample groups
+                # print sample groups / n_samples here refers to the sequence-based grouping
                 for seq in sorted(sg_groups.keys(), key=lambda x: sg_groups[x]['n_samples'], reverse = True):
                     sample_str = ""
 
@@ -352,7 +353,6 @@ def print_unique_MEs_by_type(fh, ME_inds):
             type_sc_hists[ME][sc] = 0
         type_sc_hists[ME][sc] += 1
 
-
     for type in type_sc_hists.keys():
         total = 0
         fh.write("\n\n" + type + "\n")
@@ -401,9 +401,9 @@ def main():
     parser.add_argument('--line_min_pctid', required=False, default=0, help='Minimum LINE average percent identity of aligned regions.')
     parser.add_argument('--line_min_pctcov', required=False, default=0, help='Minimum LINE percent coverage of insertion minus TSD and polyX by aligned regions.')
 
-    # global filters
-    # TODO
     args = parser.parse_args()
+    unique_seq = args.require_unique_sequence
+    unique_calu = args.require_unique_calu_lineu
 
     # ------------------------------------------------------
     # filters
@@ -450,8 +450,6 @@ def main():
     csv_files = read_csv_dir(args.csv_dir)
     sample_inds = {}
     for cf in csv_files:
-        unique_seq = args.require_unique_sequence
-        unique_calu = args.require_unique_calu_lineu
         (sample_id, index) = filter_and_index_csv_file(args.csv_dir, args.output_dir, args.output_suffix, cf, filters, unique_seq, unique_calu)
         sample_inds[sample_id] = index
 
