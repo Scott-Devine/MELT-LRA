@@ -169,6 +169,8 @@ def filter_and_index_csv_file(csv_dir, output_dir, output_suffix, cfile, filters
                         else:
                             kc.append(ME_subfamily + ":" + ME_diffs)
                     key = ":".join(kc)
+                    if key in ind:
+                        fatal("duplicate key - " + key)
                     ind[key] = row
                     
     # print number of records in and out
@@ -216,7 +218,7 @@ def count_MEs(me_ind):
 # ------------------------------------------------------
 # find_unique_MEs
 # ------------------------------------------------------
-def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
+def find_unique_MEs(fh, ME_inds, output_dir, output_suffix, merge_by_position):
     sample_ids = sorted(ME_inds.keys())
     
     # map each ME to the samples in which it appears
@@ -253,7 +255,7 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
         sample_sig_to_meis[ssig].append(k)
 
     mei_files = {}
-        
+
     for ssig in sample_sig_to_meis:
         mei_keys = sample_sig_to_meis[ssig]
         me_sample_ids = ssig.split("_")
@@ -268,57 +270,107 @@ def find_unique_MEs(fh, ME_inds, output_dir, output_suffix):
             mei_files[ofile] = True
             
         opath = os.path.join(output_dir, ofile)
+
         with open(opath, write_mode) as ofh:
-            # writer CSV header only once
+            # write CSV header only once
             if write_mode == "w":
                 ofh.write(",".join(CSV_HEADER) + "\n")
             
             # loop over ref genome loci (plus cALU/LINEu and/or INS seq)
             for k in mei_keys:
-                # group samples at this locus by sequence then genotype
-                sg_groups = {}
-                for sid in me_sample_ids:
-                    s_ind = ME_inds[sid]
-                    mei = s_ind[k]
-                    (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
-                     left_flank_seq, right_flank_seq, TSD_seq,
-                     polyX_coords, ME_coords, insertion_coords, match_string,
-                     ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
-                     overlapping_annots, genotype, hap1_region, hap2_region) = mei
 
-                    if iseq not in sg_groups:
-                        sg_groups[iseq] = { 'gt' : {}, 'n_samples' : 0 }
-                    if genotype not in sg_groups[iseq]['gt']:
-                        sg_groups[iseq]['gt'][genotype] = { 'meis': [], 'samples': [], 'n_samples': 0, 'seq': iseq, 'genotype': genotype }
+                # merge by position
+                if merge_by_position:
+                    pos_meis = []
+                    pos_samples = []
 
-                    sg_groups[iseq]['n_samples'] += 1
-                    sg_groups[iseq]['gt'][genotype]['samples'].append(sid)
-                    sg_groups[iseq]['gt'][genotype]['n_samples'] += 1
-                    sg_groups[iseq]['gt'][genotype]['meis'].append(mei)
+                    # track unique seqs and genotypes
+                    seqs = {}
+                    gtypes = {}
+                    
+                    for sid in me_sample_ids:
+                        s_ind = ME_inds[sid]
+                        mei = s_ind[k]
+                        
+                        (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+                         left_flank_seq, right_flank_seq, TSD_seq,
+                         polyX_coords, ME_coords, insertion_coords, match_string,
+                         ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
+                         overlapping_annots, genotype, hap1_region, hap2_region) = mei
 
-                # print sample groups / n_samples here refers to the sequence-based grouping
-                for seq in sorted(sg_groups.keys(), key=lambda x: sg_groups[x]['n_samples'], reverse = True):
-                    sample_str = ""
+                        pos_meis.append(mei)
+                        pos_samples.append(sid)
+                        
+                        if iseq not in seqs:
+                            seqs[iseq] = [sid]
+                        else:
+                            seqs[iseq].append(sid)
 
-                    gtype_list = sorted(sg_groups[seq]['gt'].keys(), key = lambda x: sg_groups[seq]['gt'][x]['n_samples'], reverse = True)
-                    for gtype in gtype_list:
-                        v = sg_groups[seq]['gt'][gtype]
-                        samples = v['samples']
-                        sample_str += " ".join(samples) + " [" + gtype + "] "
+                        if genotype not in gtypes:
+                            gtypes[genotype] = [sid]
+                        else:
+                            gtypes[genotype].append(sid)
 
-                    sample_str += " - " + str(sg_groups[seq]['n_samples']) + " sample(s)"
+                    row = [c for c in pos_meis[0]]
 
-                    # each unique sequence corresponds to an output row
-                    row = [c for c in v['meis'][0]]
                     # remove original sample in first column
                     row.pop(0)
+                    gtype_list = gtypes.keys()
                     
                     # set genotypes to a list, clear haplotype 1/2 info
                     row[-1] = ''
                     row[-2] = ''
-                    row[-3] = 'multiple' if len(gtype_list) > 1 else gtype_list[0]
+                    row[-3] = "/".join(gtype_list)
+                    sample_str = " ".join(pos_samples)
                     
                     ofh.write(sample_str + "," + ",".join(row) + "\n")  
+                    
+                # don't merge (only) by position
+                else:
+                    # group samples at this locus by sequence then genotype
+                    sg_groups = {}
+                    for sid in me_sample_ids:
+                        s_ind = ME_inds[sid]
+                        mei = s_ind[k]
+                        (samples, chrom, pos, strand, ME, pct_ME, pct_id, pct_cov, iseq,
+                         left_flank_seq, right_flank_seq, TSD_seq,
+                         polyX_coords, ME_coords, insertion_coords, match_string,
+                         ME_family, ME_subfamily, ME_start, ME_stop, ME_num_diag_matches, ME_num_diffs, ME_diffs,
+                         overlapping_annots, genotype, hap1_region, hap2_region) = mei
+
+                        if iseq not in sg_groups:
+                            sg_groups[iseq] = { 'gt' : {}, 'n_samples' : 0 }
+                        if genotype not in sg_groups[iseq]['gt']:
+                            sg_groups[iseq]['gt'][genotype] = { 'meis': [], 'samples': [], 'n_samples': 0, 'seq': iseq, 'genotype': genotype }
+
+                        sg_groups[iseq]['n_samples'] += 1
+                        sg_groups[iseq]['gt'][genotype]['samples'].append(sid)
+                        sg_groups[iseq]['gt'][genotype]['n_samples'] += 1
+                        sg_groups[iseq]['gt'][genotype]['meis'].append(mei)
+
+                    # print sample groups / n_samples here refers to the sequence-based grouping
+                    for seq in sorted(sg_groups.keys(), key=lambda x: sg_groups[x]['n_samples'], reverse = True):
+                        sample_str = ""
+
+                        gtype_list = sorted(sg_groups[seq]['gt'].keys(), key = lambda x: sg_groups[seq]['gt'][x]['n_samples'], reverse = True)
+                        for gtype in gtype_list:
+                            v = sg_groups[seq]['gt'][gtype]
+                            samples = v['samples']
+                            sample_str += " ".join(samples) + " [" + gtype + "] "
+
+                        sample_str += " - " + str(sg_groups[seq]['n_samples']) + " sample(s)"
+                                
+                        # each unique sequence corresponds to an output row
+                        row = [c for c in v['meis'][0]]
+                        # remove original sample in first column
+                        row.pop(0)
+                    
+                        # set genotypes to a list, clear haplotype 1/2 info
+                        row[-1] = ''
+                        row[-2] = ''
+                        row[-3] = 'multiple' if len(gtype_list) > 1 else gtype_list[0]
+                    
+                        ofh.write(sample_str + "," + ",".join(row) + "\n")  
 
 def print_unique_MEs_by_type(fh, ME_inds):
     sample_ids = sorted(ME_inds.keys())
@@ -401,6 +453,8 @@ def main():
     parser.add_argument('--line_min_pctid', required=False, default=0, help='Minimum LINE average percent identity of aligned regions.')
     parser.add_argument('--line_min_pctcov', required=False, default=0, help='Minimum LINE percent coverage of insertion minus TSD and polyX by aligned regions.')
 
+    parser.add_argument('--merge_by_position', required=False, action=argparse.BooleanOptionalAction, help='Whether to merge loci by position in the *-samples*.csv files.')
+    
     args = parser.parse_args()
     unique_seq = args.require_unique_sequence
     unique_calu = args.require_unique_calu_lineu
@@ -505,7 +559,7 @@ def main():
         # ------------------------------------------------------
         # combine samples
         # ------------------------------------------------------
-        find_unique_MEs(cfh, sample_inds, args.output_dir, args.output_suffix)
+        find_unique_MEs(cfh, sample_inds, args.output_dir, args.output_suffix, args.merge_by_position)
 
         print_unique_MEs_by_type(cfh, sample_inds)
 
