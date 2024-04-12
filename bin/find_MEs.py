@@ -14,7 +14,7 @@ from ncls import NCLS
 # ------------------------------------------------------
 # Globals
 # ------------------------------------------------------
-VERSION = '1.4.1'
+VERSION = '1.4.2'
 FASTA_SUFFIX_RE = r'\.(fa.gz|fasta.gz)$'
 FASTA_FILE_RE = r'^(.*)' + FASTA_SUFFIX_RE
 DEBUG = False
