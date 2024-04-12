@@ -55,6 +55,11 @@ const state = reactive({
     selected_me_families: me_families,
     total_family_counts: {},
     selected_family_counts: {},
+    // unique reference locus counts
+    n_ref_loci: 0,
+    n_selected_ref_loci: 0,
+    total_ref_loci_by_type: {},
+    selected_ref_loci_by_type: {},
     // genotypes
     selected_genotypes: genotypes,
     total_genotype_counts: {},
@@ -96,6 +101,15 @@ function reset_filters() {
     state.display_mode = 'table'
 }
 
+function count_unique_ref_loci(meis) {
+    let rl = {}
+    meis.forEach(m => {
+        let key = m['chrom'] + ':' + m['pos']
+        rl[key] = 1
+    })
+    return Object.keys(rl).length
+}
+
 function update_selected_meis() {
     gotoPage(1)
     let f_meis = []
@@ -103,9 +117,15 @@ function update_selected_meis() {
     // selected by type
     let selected_by_type = {}
     let n_selected_by_type = {}
+
+    let total_ref_loci_by_type = {}
+    let selected_ref_loci_by_type = {}
+
     me_types.forEach(mt => {
         n_selected_by_type[mt] = 0
         selected_by_type[mt] = false
+        total_ref_loci_by_type[mt] = {}
+        selected_ref_loci_by_type[mt] = {}
     })
     state.selected_me_types.forEach(mt =>{
         selected_by_type[mt] = true
@@ -147,6 +167,9 @@ function update_selected_meis() {
     })
 
     state.meis.forEach(m => {
+        let key = m['chrom'] + ':' + m['pos']
+        total_ref_loci_by_type[m['ME']][key] = 1
+
         if ((m['%id'] >= state.pctid_range[0]) && (m['%id'] <= state.pctid_range[1])
         && (m['%cov'] >= state.ins_pctcov_range[0]) && (m['%cov'] <= state.ins_pctcov_range[1])
         && (m['%ME'] >= state.me_pctcov_range[0]) && (m['%ME'] <= state.me_pctcov_range[1])
@@ -164,6 +187,8 @@ function update_selected_meis() {
             n_selected_by_family[m.ME_family]++
             n_selected_by_ol_rep_fam[m.overlapping_rep_fam]++
             n_selected_by_genotype[m.genotype]++
+
+            selected_ref_loci_by_type[m['ME']][key] = 1
         }
     })
     state.selected_meis = f_meis
@@ -171,6 +196,9 @@ function update_selected_meis() {
     state.selected_family_counts = n_selected_by_family
     state.selected_overlapping_rep_counts = n_selected_by_ol_rep_fam
     state.selected_genotype_counts = n_selected_by_genotype
+    state.n_selected_ref_loci = count_unique_ref_loci(f_meis)
+    state.total_ref_loci_by_type = total_ref_loci_by_type
+    state.selected_ref_loci_by_type = selected_ref_loci_by_type
 }
 
 function load_new_data() {
@@ -209,7 +237,10 @@ function load_new_data() {
     update_selected_meis()
 }
 
-watch(() => props.meis, (newValue) => { state.meis = newValue })
+watch(() => props.meis, (newValue) => {
+                state.meis = newValue
+                state.n_ref_loci = count_unique_ref_loci(newValue)
+                })
 watch(() => state.pctid_range, (newValue) => { update_selected_meis() })
 watch(() => state.ins_pctcov_range, (newValue) => { update_selected_meis() })
 watch(() => state.me_pctcov_range, (newValue) => { update_selected_meis() })
@@ -233,6 +264,12 @@ function formatRatio(n1,n2) {
 function getCountRatio(m) {
     const n1 = state.selected_mei_counts[m];
     const n2 = state.total_mei_counts[m];
+    return formatRatio(n1, n2)
+}
+
+function getUniqueRefLociCountRatio(m) {
+    const n1 = (m in state.selected_ref_loci_by_type) ? Object.keys(state.selected_ref_loci_by_type[m]).length : 0
+    const n2 = (m in state.total_ref_loci_by_type) ? Object.keys(state.total_ref_loci_by_type[m]).length : 0
     return formatRatio(n1, n2)
 }
 
@@ -270,13 +307,24 @@ state.meis = props.meis
     <v-card>
         <v-card variant="outlined" class="pa-0 ma-0">
             <v-card-title>
-                <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Filter MEIs:</span>
+              <div>
+              <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Selected MEIs:</span>
                 <v-chip label size="large" color="black" class="font-weight-medium ml-4">{{ formatRatio(state.selected_meis.length, state.meis.length) }}</v-chip> 
                 <span class="text-h6 ml-2">total </span>
                 <span v-for="me_type in ['ALU', 'LINE1', 'SVA']" class="text-h6 ml-3 mr-4">
                     <v-chip label size="large" :disabled="!state.selected_mei_counts[me_type]" :color="getMEColor(me_type)" class="font-weight-medium">{{ getCountRatio(me_type) }}</v-chip>
                     {{ me_type }}</span>
-                    
+              </div>
+ 
+             <div class='pt-1'>
+                <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Unique ref loci:</span>
+                <v-chip label size="large" color="black" class="font-weight-medium ml-4">{{ formatRatio(state.n_selected_ref_loci, state.n_ref_loci) }}</v-chip> 
+                <span class="text-h6 ml-2">total </span>
+                <span v-for="me_type in ['ALU', 'LINE1', 'SVA']" class="text-h6 ml-3 mr-4">
+                    <v-chip label size="large" :disabled="!state.selected_mei_counts[me_type]" :color="getMEColor(me_type)" class="font-weight-medium">{{ getUniqueRefLociCountRatio(me_type) }}</v-chip>
+                    {{ me_type }}</span>
+              </div>
+              
                 </v-card-title>
                 <v-container class="pa-0 ma-0 pt-2 pl-4">
                     <v-row class="pa-0 ma-0" fluid>
