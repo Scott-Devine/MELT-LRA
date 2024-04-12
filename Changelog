@@ -1,3 +1,8 @@
+v1.4.2 (April ?, 2024)
+ -No change to find_MEs.py output.
+ -Add CSV to VCF converter to produce VCF output. (#22)
+ -Update MEI viewer to report counts based on unique reference loci in addition to total counts.
+
 v1.4.1 (November 2, 2023)
  -Update MEI viewer to accommodate output from filter_and_count_MEs.py
  -Add sample/samples column to .csv file format and --sample option to find_MEs.py
