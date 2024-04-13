@@ -18,7 +18,7 @@ import sys
 VERSION = '1.4.2'
 
 CSV_FILE_RE = r'^(.*)\.csv'
-CSV_SAMPLE_ID_RE = r'^([^\/]+)-PAV-MEs.*$'
+CSV_SAMPLE_ID_RE = r'^(?:hs1|hg38)-([^\/]+)-PAV-MEs.*$'
 CSV_HEADER = None
 
 DEBUG = False
@@ -77,6 +77,9 @@ def read_csv(csv_path):
 def read_input_vcf(vcf_path, meis):
     pos2mei = meis['pos2mei']
     contigs = []
+    heading_cols = []
+    info_lines = {}
+    
     with gzip.open(vcf_path, 'rt') as fh:
         for line in fh:
 
@@ -87,7 +90,11 @@ def read_input_vcf(vcf_path, meis):
                 if m:
                     contig = { 'id': m.group(1), 'length': int(m.group(2)), 'md5': m.group(3), 'vcf': line}
                     contigs.append(contig)
-
+                ## info
+                m = re.match(r'^##INFO=<ID=([^,]+).*', line)
+                if m:
+                    info_lines[m.group(1)] = line.rstrip()
+                    
             # non-comment line
             else:
                 ## INS variant e.g., 
@@ -96,7 +103,10 @@ def read_input_vcf(vcf_path, meis):
                 if m:
                     spl = line.split("\t")
                     (chrom, pos, id, ref, alt, qual, filter, inf, fmt, sample) = tuple(line.split("\t"))
-                
+
+                    if (chrom == '#CHROM'):
+                        heading_cols = [x.rstrip() for x in line.split("\t")]
+                    
                     # check if it matches an MEI in the CSV file
                     key = ":".join([chrom, pos])
                     if key in pos2mei:
@@ -119,9 +129,12 @@ def read_input_vcf(vcf_path, meis):
         if 'vcf' not in mei:
             fatal("no VCF insertion found for MEI " + str(mei['csv']))
                 
-    return { 'contigs': contigs }
+    return { 'contigs': contigs, 'heading_cols': heading_cols, 'info_lines': info_lines }
 
-# strip % sign, not permitted in VCF Float values
+# ------------------------------------------------------
+# output formatting
+# ------------------------------------------------------
+# strip % sign, which is not permitted in VCF Float values
 def strip_pct(s):
     m = re.match(r'^(.*)%$', s)
     if m:
@@ -146,14 +159,25 @@ def main():
     if not m:
         fatal("couldn't parse sample id from " + csv_basename)
     sample = m.group(1)
-    info("csv=" + csv_basename + " sample=" + sample)
+    info("CSV=" + csv_basename + " sample=" + sample)
 
     # read CSV
     meis = read_csv(args.csv)
     
     # read input VCF
     vcf = read_input_vcf(args.vcf_input, meis)
+    heading_cols = vcf['heading_cols']
+    vcf_sample = heading_cols[-1]
+    info("input VCF SAMPLE = " + vcf_sample)
+    info_lines = vcf['info_lines']
+
+    # Q/C - check that SAMPLE matches between input CSV and VCF files
+    if vcf_sample != sample:
+        fatal("sample from input VCF (" + vcf_sample + ") does not match sample extracted from CSV filename (" + sample + ")")
     
+    # INFO fields to copy from input VCF
+    info_to_copy = ['QRY_REGION', 'QRY_STRAND', 'SVLEN']
+
     with open(args.vcf_output, 'w') as vcf_fh:
         vcf_fh.write("##fileformat=VCFv4.2\n")
         vcf_fh.write("##fileDate=" + date.today().strftime("%Y%m%d") + "\n")
@@ -190,35 +214,17 @@ def main():
             { 'column': 'FORMAT', 'id': "GT", 'num': "1", 'type': "String", 'descr': 'Genotype' },
         ]
 
-        # TO ADD (back):
-        #  strand
-        #  insertion length
+        # copy INFO fields from input VCF
+        for ifld in info_to_copy:
+            vcf_fh.write(info_lines[ifld] + "\n")
         
+        # add new INFO fields
         for hi in heading_info:
             column = 'INFO'
             if 'column' in hi:
                 column = hi['column']
             vcf_fh.write("##" + column + "=<ID=" + hi['id'] + ",Number=" + hi['num'] + ",Type=" + hi['type'] + ',Description="' + hi['descr'] + '"')
             vcf_fh.write(",Source=" + '"MELT-RISC"' + ",Version=" + '"' + VERSION + '">' + "\n")
-        
-##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Variant type">
-##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Variant length">
-##INFO=<ID=HAP,Number=1,Type=String,Description="List of haplotype names variant was identified in">
-##INFO=<ID=COV_MEAN,Number=.,Type=String,Description="Mean coverage for each haplotype under the whole variant (not just breakpoints, INFO/HAP order)">
-##INFO=<ID=COV_PROP,Number=.,Type=String,Description="Proportion of reference bases under the whole variant with at least one aligned query (assembly sequence) (INFO/HAP order)">
-##INFO=<ID=QRY_REGION,Number=.,Type=String,Description="Region of the query (assembly sequence) where this variant was found (chrom:pos-end, 1-based, closed coordinates, not BED) (INFO/HAP order)">
-##INFO=<ID=QRY_STRAND,Number=.,Type=String,Description="Orientation of the aligned query (assembly sequence) at this site (INFO/HAP order)">
-##INFO=<ID=CALL_SOURCE,Number=.,Type=String,Description="How variant was called - CIGAR, ALIGN_TRUNC, etc (INFO/HAP order)">
-##INFO=<ID=INNER_REF,Number=.,Type=String,Description="Inversion inner breakpoint in reference coordinates (INFO/HAP order)">
-##INFO=<ID=INNER_TIG,Number=.,Type=String,Description="Inversion inner breakpoint in contig coordinates (INFO/HAP order)">
-##INFO=<ID=SEQ,Number=.,Type=String,Description="SV or indel sequence">
-##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##ALT=<ID=INV,Description="Inversion">
-##FILTER=<ID=PASS,Description="Variant passed filters">
-##FILTER=<ID=QRY_FILTER,Description="Query filter region">
-##FILTER=<ID=COMPOUND,Description="Inside larger variant">
-##FILTER=<ID=SVLEN,Description="Variant size out of bounds">
-##FILTER=<ID=TRIM,Description="Alignment trimming removed variant region">
         
         col_headings = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', sample]
         vcf_fh.write("#" + "\t".join(col_headings) + "\n")
@@ -240,10 +246,14 @@ def main():
 
             mei_id = vcf['id'] + "-" + ME
 
-            # TODO - add INFO from CSV
-            # TODO - add any standard INFO fields from VCF?
+            # copy over selected INFO fields
+            vcf_if = {}
+            ifields = vcf['info'].split(';')
+            for ifld in ifields:
+                (key, val) = ifld.split('=')
+                vcf_if[key] = val
             
-            # INFO fields
+            # new INFO fields
             infs = [
                 ['ID', mei_id],
                 ['PAV_ID', vcf['id']],
@@ -264,6 +274,11 @@ def main():
                 ['ME_DIFFS', ME_diffs],
                 ['ME_OVERLAPPING_REPEATS', overlapping_annots],
             ]
+
+            # INFO fields from original VCF
+            for ifld in info_to_copy:
+                infs.append([ifld, vcf_if[ifld]])
+            
             inf_str = ";".join([inf[0] + "=" + ('.' if inf[1] == '' else inf[1]) for inf in infs])
             
             vcf_cols = [
