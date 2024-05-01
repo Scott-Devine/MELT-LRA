@@ -252,7 +252,11 @@ def main():
             for ifld in ifields:
                 (key, val) = ifld.split('=')
                 vcf_if[key] = val
-            
+
+            # VCF doesn't allow whitespace
+            if ME_diffs == 'No Differences':
+                ME_diffs = 'No_Differences'
+                
             # new INFO fields
             infs = [
                 ['ID', mei_id],
@@ -278,7 +282,16 @@ def main():
             # INFO fields from original VCF
             for ifld in info_to_copy:
                 infs.append([ifld, vcf_if[ifld]])
-            
+
+            # Q/C - check for presence of illegal characters in keys and values
+            # "(String, no whitespace, semicolons, or equals-signs permitted; commas are permitted only as delimiters for lists of values)"
+            for inf in infs:
+                if re.match(r'.*[;\s=,].*', inf[0]):
+                    fatal("illegal character in INFO key - " + inf[0])
+                if re.match(r'.*[;\s=,].*', inf[1]):
+                    fatal("illegal character in INFO value - " + inf[1])
+
+                
             inf_str = ";".join([inf[0] + "=" + ('.' if inf[1] == '' else inf[1]) for inf in infs])
             
             vcf_cols = [
