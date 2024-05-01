@@ -45,7 +45,12 @@ def extract_seqs(vcf, min_seqlen, max_seqlen):
 
             inf_d = {}
             for inf in info.split(';'):
-                (k, v) = inf.split('=')
+                k = inf
+                v = None
+                
+                if re.match(r'^.*=.*$', inf):
+                    (k, v) = inf.split('=')
+                    
                 if k in inf_d:
                     log_fatal("key " + k + " already seen in " + info)
                 inf_d[k] = v
