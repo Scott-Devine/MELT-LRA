@@ -5,6 +5,7 @@
 
 import argparse
 import csv
+from datetime import date
 import gzip
 import os
 import re
@@ -13,6 +14,8 @@ import sys
 # ------------------------------------------------------
 # globals
 # ------------------------------------------------------
+VERSION = '1.4.2'
+
 VCF_REGEX = r'^.*\.vcf\.gz$'
 
 # increase CSV max field size
@@ -43,16 +46,30 @@ def warn(msg):
 def read_individual_vcf(fpath, seq_index, ref_pos_index):
     lnum = 0
     debug("reading " + fpath)
+
+    m = re.match(r'.*((NA|HG)\d+)-(h1|h2|un).*', fpath)
+    if not m:
+        fatal("couldn't parse sample/haplotype from " + fpath)
+
+    sample = m.group(1)
+    haplotype = m.group(3)
+    info_lines = []
     
     with gzip.open(fpath, 'rt') as fh:
         cr = csv.reader(fh, delimiter='\t')
         for row in cr:
             lnum += 1
             if re.match(r'^\#.*$', row[0]):
+                if re.match(r'^\#\#INFO=.*$', row[0]):
+                    info_lines.append(row[0])
                 continue
 
             # index each variant by ALT sequence and ref position
             (chrom, pos, vcf_id, ref, alt, qual, filt, inf, fmt, *rest) = row
+
+            # add sample/haplotype to vcf_id
+            row[2] = ":".join([sample, haplotype, vcf_id])
+
             ins_seq = alt[1:]
             
             if ins_seq not in seq_index:
@@ -64,6 +81,8 @@ def read_individual_vcf(fpath, seq_index, ref_pos_index):
             if ref_pos not in ref_pos_index:
                 ref_pos_index[ref_pos] = []
             ref_pos_index[ref_pos].append(row)
+
+    return { 'info': info_lines }
             
 # ------------------------------------------------------
 # read_individual_vcf_dir
@@ -72,18 +91,18 @@ def read_individual_vcfs_dir(dpath):
     seq_index = {}
     ref_pos_index = {}
     nfiles = 0
-
+    info_lines = None
+    
     for file in os.listdir(dpath):
         if re.match(VCF_REGEX, file):
             fpath = os.path.join(dpath, file)
-            read_individual_vcf(fpath, seq_index, ref_pos_index)
+            vc = read_individual_vcf(fpath, seq_index, ref_pos_index)
+            if info_lines is None:
+                info_lines = vc['info']
             nfiles += 1
-#        if DEBUG and nfiles >= 20:
-#            debug("reading only first 20 files")
-#            break
 
     info("read " + str(nfiles) + " VCF file(s) from " + dpath)
-    return { 'seq_index': seq_index, 'ref_pos_index': ref_pos_index }
+    return { 'seq_index': seq_index, 'ref_pos_index': ref_pos_index, 'info': info_lines }
     
 # ------------------------------------------------------
 # main()
@@ -102,157 +121,262 @@ def main():
     vcf_ind = read_individual_vcfs_dir(args.individual_vcf_dir)
     rpi = vcf_ind['ref_pos_index']
     si = vcf_ind['seq_index']
+    info_lines = vcf_ind['info']
     
     # iterate over merged freeze VCF
     info("reading " + args.freeze_vcf)
 
-    # number of position matches with/without exact seq match
-    exact_match = 0
-    no_exact_match = 0
+    # output file
+    ofh = open(args.output_vcf, 'w')
+    info("writing " + args.output_vcf)
+    ofh.write("##fileformat=VCFv4.2\n")
+    ofh.write("##fileDate=" + date.today().strftime("%Y%m%d") + "\n")
+    ofh.write("##source=MELT-RISC " + VERSION + "\n")
+    ofh.write("##reference=" + args.freeze_vcf + "\n")
+    
+    # number of ref positions matched (including insertion length)
+    n_ref_positions_found = 0
+    # number of ref seqs matched
+    n_ref_seqs_found = 0
+    
+    # counts by reference entry (ref pos including insertion length)
+    entry_counts = {
+        'exact': 0,
+        'exact_seq_close_pos' : 0,
+        'exact_pos_close_seq': 0,
+        'total': 0,                 # total based on entries with either ref position or ref seq found in index
+    }
+    
+    # counts by reference haplotype
+    hap_counts = {
+        'exact': 0,
+        'exact_seq_close_pos' : 0,
+        'exact_pos_close_seq': 0,
+        'total': 0,                 # total based on reference entries with exact seq match
+    }
 
-    # total number of expected matches based on genotypes ('1|1|.' = 2 matches expected)
-    total_n_expected = 0
-    # actual number of matches found
-    total_n_found_ref_pos = 0
-    total_n_found_ref_pos_seq = 0
-    total_n_found_seq = 0
-    
-    # TODO - check that the matches are found in the haplotypes where we expect
-    
+    info_lines_printed = False
     lnum = 0
+    
     with gzip.open(args.freeze_vcf, 'rt') as fh:
         cr = csv.reader(fh, delimiter='\t')
         for row in cr:
             lnum += 1
             if re.match(r'^\#.*$', row[0]):
+                # take contig and FORMAT lines from freeze file
+                m = re.match(r'^\#\#(contig|FORMAT)=.*$', row[0])
+                if m or row[0] == '#CHROM':
+                    # insert INFO lines from individual VCFs before FORMAT
+                    if m and m.group(1) == 'FORMAT' and not info_lines_printed:
+                        ofh.write("\n".join(info_lines) + "\n")
+                        info_lines_printed = True
+                    ofh.write("\t".join(row) + "\n")
+
+                # echo some INFO lines from freeze file
+
+                # INFO lines from freeze file:
+                ##INFO=<ID=ID,Number=A,Type=String,Description="ID of merged variant set (max one variant per sample)">
+                ##INFO=<ID=VARTYPE,Number=A,Type=String,Description="Variant class">
+                ##INFO=<ID=SVTYPE,Number=A,Type=String,Description="Variant type">
+                ##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length of ref and alt alleles">
+                ##INFO=<ID=SAMPLE,Number=.,Type=String,Description="Lead sample variant was called on. SV sequence, breakpoints, and contig locations come from the SV call in this sample.">
+                ##INFO=<ID=REF_SD,Number=.,Type=Float,Description="Max segmental duplication (SD) identity variant intersects.">
+                ##INFO=<ID=REF_TRF,Number=0,Type=Flag,Description="Variant intersects a reference TRF region">
+                
+                # already have ID (as PAV_ID), also keeping SAMPLE
+                
+                if re.match(r'^\#\#INFO=\<ID=(SAMPLE),.*$', row[0]):
+                    ofh.write("\t".join(row) + "\n")
                 continue
-
+                    
             (chrom, pos, vcf_id, ref, alt, qual, filt, inf, fmt, *rest) = row
-
+            ins_seq = alt[1:]
+            
             # examine insertions only
             if not re.match(r'.*-INS-.*', vcf_id):
                 continue
 
-            # TODO - expected haplotype count should be based on the number of MEIs that carry over
-            # count '1's to find expected number of matches (not necessarily exact)
-            n_expected = 0
+            # parse INFO fields
+            inf_d = {}
+            for i in inf.split(';'):
+                k = i
+                v = None
+                
+                if re.match(r'^.*=.*$', i):
+                    (k, v) = i.split('=')
+                    
+                if k in inf_d:
+                    log_fatal("key " + k + " already seen in " + info)
+                inf_d[k] = v
+            
+            # count 1s to find number of haplotype/samples matches
+            n_haplotypes = 0
             for gt in rest:
                 for hap in gt.split('|'):
                     if hap == '1':
-                        n_expected += 1
-            total_n_expected += n_expected
+                        n_haplotypes += 1
+            
+            # different levels of matching
+
+            # exact: ref pos, insertion length, insertion sequence
+            m_exact = []
+            m_exact_d = {}
+            
+            # exact: insertion length, insertion sequence
+            # close: ref pos
+            m_exact_seq_close_pos = []
+            m_exact_seq_close_pos_d = {}
+
+            # exact: ref pos
+            # close: insertion length, insertion sequence
+            m_exact_pos_close_seq = []
+            m_exact_pos_close_seq_d = {}
 
             # -----------------------------------------------------------
-            # 1. find matching MEIs (if any) by sequence position
+            # find matching MEIs by sequence position + ins length
             # -----------------------------------------------------------
-            ins_len = len(alt) - 1
+            ref_pos_in_index = False
+            ins_len = len(ins_seq)
             ref_pos = ":".join([chrom, pos, str(ins_len)])
-            exact_matches = {}
             
             if ref_pos in rpi:
+                ref_pos_in_index = True
                 meis = rpi[ref_pos]
-                nm = len(meis)
-                total_n_found_ref_pos += nm
                 
-                # count how many have exact sequence match
+                # check for exact/approximate sequence match
                 num_em = 0
                 for mei in meis:
                     (m_chrom, m_pos, m_vcf_id, m_ref, m_alt, m_qual, m_flt, m_inf, m_fmt, *m_rest) = mei
-                    if m_alt == alt:
+                    m_ins_seq = m_alt[1:]
+
+                    # case 1: exact position match and exact sequence match
+                    if m_ins_seq == ins_seq:
                         num_em += 1
-                        exact_matches[m_vcf_id] = True
+                        m_exact.append(mei)
+                        m_exact_d[m_vcf_id] = True
 
-                if num_em == 0:
-                    no_exact_match += 1
-                    warn("found " + str(nm) + " MEIs for " + ref_pos + " " + str(num_em) + " / " + str(nm) + " have exact ref position and ALT seq match")
-                    for mei in meis:
-                        warn(" mei=" + str(mei))
-                    
-                elif num_em > 0:
-                    exact_match += 1
-
-                total_n_found_ref_pos_seq += num_em
+                    # case 2: exact position match and close sequence match
+                    # TODO
+                    elif False:
+                        pass
 
             # -----------------------------------------------------------
-            # 2. find matching MEIs by sequence identity
+            # find matching MEIs by sequence identity
             # -----------------------------------------------------------
+            ref_seq_in_index = False
             ins_seq = alt[1:]
             
             if ins_seq in si:
+                ref_seq_in_index = True
                 meis = si[ins_seq]
-                nm = len(meis)
-#                info("found " + str(nm) + " MEIs with seq=" + alt)
 
                 # filter out the exact matches that have already been found
                 new_meis = []
                 for mei in meis:
                     (m_chrom, m_pos, m_vcf_id, m_ref, m_alt, m_qual, m_flt, m_inf, m_fmt, *m_rest) = mei
-                    if m_vcf_id not in exact_matches:
+                    if m_vcf_id not in m_exact_d:
                         new_meis.append(mei)
 
                 n_new = len(new_meis)
-#                info("found " + str(n_new) + "/" + str(nm) + " new MEIs with seq=" + alt)
 
-                # TODO- check how many of these are near enough to the original
-                close_meis = []
+                # check exact sequence matches for proximity to ref
                 if n_new > 0:
-#                    info("checking exact seq matches for proximity to " + vcf_id + " " + ref_pos)
                     for new_mei in new_meis:
                         (m_chrom, m_pos, m_vcf_id, m_ref, m_alt, m_qual, m_flt, m_inf, m_fmt, *m_rest) = new_mei
-                        m_ins_len = len(m_alt) - 1
                         if chrom != m_chrom:
                             continue
                         dist = abs(int(pos) - int(m_pos))
                         if dist < args.max_dist_bp:
-                            close_meis.append(new_mei)
+                            m_exact_seq_close_pos.append(new_mei)
+                            m_exact_seq_close_pos_d[m_vcf_id] = True
                         
-                            info(" found " + m_vcf_id + " " + m_chrom + " " + m_pos + " " + str(m_ins_len) + " dist=" + str(dist))
-                        # TODO
-                        
-                n_close = len(close_meis)
+                n_exact_seq_close_pos = len(m_exact_seq_close_pos)
 
-                total_n_found_seq += n_close
+            # -----------------------------------------------------------
+            # output exemplar
+            # -----------------------------------------------------------
+            exact_seq_matches = m_exact
+            exact_seq_matches.extend(m_exact_seq_close_pos)
 
-            # TODO - what's left?
-            #  -matches that are close in sequence and position but not identical in both
+            if len(exact_seq_matches) > 0:
+                # index exact matches by sample-haplotype
+                esm_d = {}
+                for mei in exact_seq_matches:
+                    (m_chrom, m_pos, m_vcf_id, m_ref, m_alt, m_qual, m_flt, m_inf, m_fmt, *m_rest) = mei
+                    (sample, hap, m_id) = m_vcf_id.split(":")
+                    key = "-".join([sample, hap])
+                    if key in esm_d:
+                        fatal("duplicate key " + key)
+                    esm_d[key] = mei
+                    
+                # freeze SAMPLE (e.g., 'NA18534-h1' should specify the corresponding sample/haplotype)
+                sample = inf_d['SAMPLE']
+                ind_mei = esm_d[sample]
+                (i_chrom, i_pos, i_vcf_id, i_ref, i_alt, i_qual, i_flt, i_inf, i_fmt, *i_rest) = ind_mei
+
+                # sanity checks
+                if i_ref != ref:
+                    fatal("REF mismatch")
+                if i_alt != alt:
+                    fatal("ALT mismatch")
+
+                (samp, hap, m_id) = i_vcf_id.split(":")
+                i_inf += ";SAMPLE=" + sample
                 
-        info("exact seq match = " + str(exact_match))
-        info("no exact seq match = " + str(no_exact_match)) 
-
-        info("expected matches = " + str(total_n_expected))
-        info("matches by reference position and sequence = " + str(total_n_found_ref_pos_seq))
-        info("matches by reference position and insertion length = " + str(total_n_found_ref_pos))
-        info("matches by sequence and proximity = " + str(total_n_found_seq))
+                # keep position from freeze VCF; individual MEI location may be different
+                new_cols = [chrom, pos, m_id, ref, alt, qual, filt, i_inf, fmt, *rest]
                 
-        # TODO - select one to write to the output file
+                # also need haplotypes from freeze
+                ofh.write("\t".join(new_cols) + "\n")
                 
-            # TODO - look for matches by sequence but NOT position and see how many are nearby
-
-            # no matches found by reference position - check sequence index instead
-#            else:
-#                pass
+            # -----------------------------------------------------------
+            # update counts
+            # -----------------------------------------------------------
+            if ref_pos_in_index:
+                n_ref_positions_found += 1
+            if ref_seq_in_index:
+                n_ref_seqs_found += 1
+            if ref_pos_in_index or ref_seq_in_index:
+                entry_counts['total'] += 1
+                hap_counts['total'] += n_haplotypes;
             
-#            if ref_pos not in ref_pos_index:
-#                ref_pos_index[ref_pos] = []
-#            ref_pos_index[ref_pos].append(row)
-    
+            n_exact = len(m_exact)
+            n_exact_seq_close_pos = len(m_exact_seq_close_pos)
+            n_exact_pos_close_seq = len(m_exact_pos_close_seq)
 
-    # TODO - write output file
-    
-    # TODO
-    # read merged/filtered VCF and compare:
-    # for each position
-    #   look up sample MEIs by position alone
-    #   count how many MEIs match the sequence exactly
-    #   print one (which one) of the MEIs with an exact sequence match
+            hap_counts['exact'] += n_exact;
+            hap_counts['exact_seq_close_pos'] += n_exact_seq_close_pos;
+            hap_counts['exact_pos_close_seq'] += n_exact_pos_close_seq;
 
-    #  count sample MEIs that match by sequence but not position and see how far away they are
+            # entry counts are nonredundant
+            if n_exact > 0:
+                entry_counts['exact'] += 1;
+            elif n_exact_seq_close_pos > 0:
+                entry_counts['exact_seq_close_pos'] += 1;
+            elif n_exact_pos_close_seq > 0:
+                entry_counts['exact_pos_close_seq'] += 1;
 
-    #  compare counts with number of 1s in the genotypes
+    # -----------------------------------------------------------
+    # report stats
+    # -----------------------------------------------------------
+    for key in ['total', 'exact', 'exact_seq_close_pos', 'exact_pos_close_seq']:
+        info("entries / " + key + " : " + str(entry_counts[key]))
+
+    for key in ['total', 'exact', 'exact_seq_close_pos', 'exact_pos_close_seq']:
+        info("haplotypes / " + key + " : " + str(hap_counts[key]))
+        
+    # TODO - check for matches that are close in sequence and position but not identical in either?
+    # TODO - check that all the exact sequence matches match (except for vcf_id, which contains sample + hap)
     
-    # for each position report/record:
+    # TODO - for each position add to the VCF:
     #   -actual number of exact occurrences (i.e., haplotype+sample count, with or without 'un')
     #   -number of merged occurrences (i.e., count up the '1's in the reported genotypes)
+
+    # total hap count (all 1s)
+    # exact hap count
+    # other categories of counts
+    
+    # TODO - check that the accumulated matches are found in the expected samples/haplotypes [optional]
     
 if __name__ == '__main__':
     main()
