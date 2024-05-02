@@ -134,10 +134,14 @@ def main():
     ofh.write("##source=MELT-RISC " + VERSION + "\n")
     ofh.write("##reference=" + args.freeze_vcf + "\n")
     
-    # number of ref positions matched (including insertion length)
-    n_ref_positions_found = 0
-    # number of ref seqs matched
-    n_ref_seqs_found = 0
+    # number of freeze VCF positions matched (including insertion length)
+    n_freeze_vcf_pos_plus_inslen_found = 0
+    # number of freeze VCF insertion seqs matched
+    n_freeze_vcf_ins_seqs_found = 0
+    # reference positions found, irrespective of insertion length or sequence
+    freeze_vcf_pos_found = {}
+    # ME types found
+    ME_types_found = { 'ALU': 0, 'SVA': 0, 'LINE1': 0 }
     
     # counts by reference entry (ref pos including insertion length)
     entry_counts = {
@@ -328,18 +332,25 @@ def main():
                 
                 # also need haplotypes from freeze
                 ofh.write("\t".join(new_cols) + "\n")
-                
+
+                # record type
+                m = re.match(r'^.*-(ALU|SVA|LINE1)$', m_id)
+                if not m:
+                    fatal("unable to parse ME type from id " + m_id)
+                ME_types_found[m.group(1)] += 1
+
             # -----------------------------------------------------------
             # update counts
             # -----------------------------------------------------------
             if ref_pos_in_index:
-                n_ref_positions_found += 1
+                n_freeze_vcf_pos_plus_inslen_found += 1
             if ref_seq_in_index:
-                n_ref_seqs_found += 1
+                n_freeze_vcf_ins_seqs_found += 1
             if ref_pos_in_index or ref_seq_in_index:
                 entry_counts['total'] += 1
                 hap_counts['total'] += n_haplotypes;
-            
+                freeze_vcf_pos_found[chrom + ":" + pos] = True
+                
             n_exact = len(m_exact)
             n_exact_seq_close_pos = len(m_exact_seq_close_pos)
             n_exact_pos_close_seq = len(m_exact_pos_close_seq)
@@ -359,11 +370,18 @@ def main():
     # -----------------------------------------------------------
     # report stats
     # -----------------------------------------------------------
+    info("freeze VCF ref positions matched : " + str(len(freeze_vcf_pos_found)))
+    info("freeze VCF lines matched by position and SVLEN : " + str(n_freeze_vcf_pos_plus_inslen_found))
+    info("freeze VCF lines matched by insertion sequence : " + str(n_freeze_vcf_ins_seqs_found))
+
     for key in ['total', 'exact', 'exact_seq_close_pos', 'exact_pos_close_seq']:
         info("entries / " + key + " : " + str(entry_counts[key]))
 
     for key in ['total', 'exact', 'exact_seq_close_pos', 'exact_pos_close_seq']:
         info("haplotypes / " + key + " : " + str(hap_counts[key]))
+
+    for key in ME_types_found.keys():
+        info(key + " : " + str(ME_types_found[key]))
         
     # TODO - check for matches that are close in sequence and position but not identical in either?
     # TODO - check that all the exact sequence matches match (except for vcf_id, which contains sample + hap)
