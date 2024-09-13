@@ -21,7 +21,7 @@ VCF_REGEX = r'^.*\.vcf\.gz$'
 # increase CSV max field size
 csv.field_size_limit(256 * 1024 * 1024)
 
-DEBUG = True
+DEBUG = False
 
 # ------------------------------------------------------
 # logging
@@ -142,6 +142,8 @@ def main():
     freeze_vcf_pos_found = {}
     # ME types found
     ME_types_found = { 'ALU': 0, 'SVA': 0, 'LINE1': 0 }
+    # maps reference pos to number of haplotypes
+    freeze_vcf_pos_to_hap_count = {}
     
     # counts by reference entry (ref pos including insertion length)
     entry_counts = {
@@ -219,6 +221,10 @@ def main():
                 for hap in gt.split('|'):
                     if hap == '1':
                         n_haplotypes += 1
+                        
+            # don't expect to find anything in more than 2 samples per position
+            if n_haplotypes > 130:
+                warn("n_haplotypes = " + str(n_haplotypes) + " at " + str(chrom) + ":" + str(pos))
             
             # different levels of matching
 
@@ -350,6 +356,7 @@ def main():
                 entry_counts['total'] += 1
                 hap_counts['total'] += n_haplotypes;
                 freeze_vcf_pos_found[chrom + ":" + pos] = True
+                freeze_vcf_pos_to_hap_count[ref_pos] = n_haplotypes
                 
             n_exact = len(m_exact)
             n_exact_seq_close_pos = len(m_exact_seq_close_pos)
@@ -382,7 +389,26 @@ def main():
 
     for key in ME_types_found.keys():
         info(key + " : " + str(ME_types_found[key]))
-        
+
+    # build histogram of haplotype counts per ref position
+    hist = {}
+    sum = 0
+    n_positions = 0
+    for rp in freeze_vcf_pos_to_hap_count:
+        count = freeze_vcf_pos_to_hap_count[rp]
+        if count not in hist:
+            hist[count] = 0
+        hist[count] += 1
+        n_positions += 1
+        sum += count
+
+    info("average samples/ref locus = " + str(sum / n_positions))
+    info("n_positions = " + str(n_positions))
+    info("total samples/alleles = " + str(sum))
+
+    for k in sorted(hist):
+        print(str(k) + "\t" + str(hist[k]))
+    
     # TODO - check for matches that are close in sequence and position but not identical in either?
     # TODO - check that all the exact sequence matches match (except for vcf_id, which contains sample + hap)
     
