@@ -131,7 +131,7 @@ def main():
     info("writing " + args.output_vcf)
     ofh.write("##fileformat=VCFv4.2\n")
     ofh.write("##fileDate=" + date.today().strftime("%Y%m%d") + "\n")
-    ofh.write("##source=MELT-RISC " + VERSION + "\n")
+    ofh.write("##source=MELT-LRA " + VERSION + "\n")
     ofh.write("##reference=" + args.freeze_vcf + "\n")
     
     # number of freeze VCF positions matched (including insertion length)

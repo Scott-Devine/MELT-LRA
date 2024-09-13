@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Convert MELT-RISC CSV output to VCF.
+# Convert MELT-LRA CSV output to VCF.
 
 import argparse
 import csv
@@ -147,8 +147,8 @@ def strip_pct(s):
 def main():
 
     # input
-    parser = argparse.ArgumentParser(description='Convert MELT-RISC CSV output to VCF.')
-    parser.add_argument('--csv', required=True, help='Path to input MELT-RISC CSV file.')
+    parser = argparse.ArgumentParser(description='Convert MELT-LRA CSV output to VCF.')
+    parser.add_argument('--csv', required=True, help='Path to input MELT-LRA CSV file.')
     parser.add_argument('--vcf_input', required=True, help='Path to original PAV variant call VCF file.')
     parser.add_argument('--vcf_output', required=True, help='Path to output VCF file.')
     args = parser.parse_args()
@@ -181,7 +181,7 @@ def main():
     with open(args.vcf_output, 'w') as vcf_fh:
         vcf_fh.write("##fileformat=VCFv4.2\n")
         vcf_fh.write("##fileDate=" + date.today().strftime("%Y%m%d") + "\n")
-        vcf_fh.write("##source=MELT-RISC " + VERSION + "\n")
+        vcf_fh.write("##source=MELT-LRA " + VERSION + "\n")
         vcf_fh.write("##reference=" + args.vcf_input + "\n")
 
         # write all input contigs, not just those with PAV calls
@@ -224,7 +224,7 @@ def main():
             if 'column' in hi:
                 column = hi['column']
             vcf_fh.write("##" + column + "=<ID=" + hi['id'] + ",Number=" + hi['num'] + ",Type=" + hi['type'] + ',Description="' + hi['descr'] + '"')
-            vcf_fh.write(",Source=" + '"MELT-RISC"' + ",Version=" + '"' + VERSION + '">' + "\n")
+            vcf_fh.write(",Source=" + '"MELT-LRA"' + ",Version=" + '"' + VERSION + '">' + "\n")
         
         col_headings = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', sample]
         vcf_fh.write("#" + "\t".join(col_headings) + "\n")

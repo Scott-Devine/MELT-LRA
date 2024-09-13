@@ -11,8 +11,11 @@ import sys
 # ------------------------------------------------------
 # globals
 # ------------------------------------------------------
+# HG00171-ALU-water.out
 WATER_REGEX = r'^.*-water(-rev)?\.out$'
 SAMPLE_REGEX = r'^((HG|NA)\d+).*-water(-rev)?\.out$'
+# e.g., HG00171-h1-ALU-water.out
+SAMPLE_HAP_REGEX = r'^((HG|NA)\d+).*-water(-rev)?\.out$'
 FINAL_LINE_REGEX = r'^#---------------------------------------$'
 DEBUG = False
 

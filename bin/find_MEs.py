@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# MELT-RISC: identify and classify mobile element insertions (MEIs) in PAV calls.
+# MELT-LRA: identify and classify mobile element insertions (MEIs) in PAV calls.
 
 import argparse
 import csv
