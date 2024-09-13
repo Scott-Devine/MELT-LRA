@@ -301,6 +301,18 @@ function deselectAllGenotypes() {
 }
 state.meis = props.meis
 
+function getUCSCBrowserURL(mei) {
+  let genome = 'hs1'
+  if (mei.samples.match(/^hg38.*/)) {
+    genome = 'hg38'
+  }
+  let url = 'http://genome.ucsc.edu/cgi-bin/hgTracks?db=' + genome + '&position='
+  url += mei.chrom + '%3A' + (mei.pos - 500) + '-' + (mei.pos + 500)
+  url += "&highlight=" + genome + "." + mei.chrom + "%3A" + mei.pos + "-" + mei.pos + "%23ffa0a0"
+  console.log("url=" + url)
+  window.open(url, '_blank')
+}
+                
 </script>
 
 <template>
@@ -532,6 +544,10 @@ state.meis = props.meis
                 >
                 <template #item-MEI="item">
                     <MiniMEI :key="item.key + '-mini'" :mei="item" />
+                </template>
+                
+                <template #item-pos="item">
+                  <a @click="getUCSCBrowserURL(item)">{{ item.pos }}</a>
                 </template>
                 
                 <template #expand="item">
