@@ -1,4 +1,4 @@
-# MELT-RISC
+# MELT-LRA
 
 Example output for a single MEI call:
 

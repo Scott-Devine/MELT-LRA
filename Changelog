@@ -1,4 +1,5 @@
 v1.4.2
+ -Project/repo renamed from MELT-RISC to MELT-LRA.
  -No change to find_MEs.py output.
  -Add CSV to VCF converter to produce VCF output. (#22)
  -Update MEI viewer to report counts based on unique reference loci in addition to total counts.
