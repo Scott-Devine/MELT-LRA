@@ -63,7 +63,7 @@ def read_csv(csv_path):
             
             key = ":".join([chrom, pos])
             if key in pos2mei:
-                fatal()
+                fatal("multiple MEIs at position " + key)
 
             mei = { 'csv': row }
             meis.append(mei)
