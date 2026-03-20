@@ -357,7 +357,7 @@ function getUCSCBrowserURL(mei) {
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         ME families:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
@@ -372,13 +372,13 @@ function getUCSCBrowserURL(mei) {
                                             </template>
                                         </v-select>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         PAV genotypes:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
@@ -393,97 +393,97 @@ function getUCSCBrowserURL(mei) {
                                             </template>
                                         </v-select>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         Insertion size range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.me_ins_length_range" :min="0" :max="20000" :step="50" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.me_ins_length_range[0] }}bp - {{ state.me_ins_length_range[1] }}bp
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         Percent identity range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.pctid_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.pctid_range[0] }}% - {{ state.pctid_range[1] }}%
                                     </v-col>
                                 </v-row>
 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         Insertion %coverage range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.ins_pctcov_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.ins_pctcov_range[0] }}% - {{ state.ins_pctcov_range[1] }}%
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         Reference ME %coverage range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.me_pctcov_range" :min="0" :max="100" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.me_pctcov_range[0] }}% - {{ state.me_pctcov_range[1] }}%
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         TSD length range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.tsd_length_range" :min="0" :max="3000" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.tsd_length_range[0] }}bp - {{ state.tsd_length_range[1] }}bp
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pr-3 text-right">
                                         polyA/T length range:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.polyx_length_range" :min="0" :max="2000" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.polyx_length_range[0] }}bp - {{ state.polyx_length_range[1] }}bp
                                     </v-col>
                                 </v-row>         
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
                                         Number of overlapping hg38 repeats:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.overlapping_repeats_range" :min="0" :max="10" :step="1" thumb-label hide-details></v-range-slider>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         {{ state.overlapping_repeats_range[0] }} - {{ state.overlapping_repeats_range[1] }}
                                     </v-col>
                                 </v-row>  
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-2 pr-3 text-right">
                                         Overlapping hg38 repeat family:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
@@ -498,16 +498,16 @@ function getUCSCBrowserURL(mei) {
                                             </template>
                                         </v-select>
                                     </v-col>
-                                    <v-col cols="2" class="pa-0 ma-0 pl-3">
+                                    <v-col cols="1" class="pa-0 ma-0 pl-3">
                                         
                                     </v-col>
                                 </v-row>
                                 
                                 <v-row class="pa-0 ma-0">
-                                    <v-col cols="2" class="pa-0 ma-0">
+                                    <v-col cols="3" class="pa-0 ma-0 pt-2 pr-3 text-right">
                                         Display:
                                     </v-col>
-                                    <v-col cols="10" class="pa-0 ma-0">
+                                    <v-col cols="9" class="pa-0 ma-0">
                                         <v-radio-group v-model="state.display_mode" inline>
                                             <v-radio label="Sortable table" value="table" density="compact"></v-radio>
                                             <v-radio label="Full-size figures [much slower]" value="figures" density="compact" class="pl-2"></v-radio>
