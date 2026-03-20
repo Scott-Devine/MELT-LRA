@@ -40,8 +40,8 @@ const currentPage = computed(() => dataTable.value?.currentPaginationNumber);
 
 const sortBy = []
 const sortType = []
-const me_types = ['ALU', 'LINE1', 'SVA']
-const me_families = ['ALU', 'AluJ', 'AluS', 'AluY', 'LINE1', 'SVA']
+const me_types = ['ALU', 'LINE1', 'SVA', 'HERV_K']
+const me_families = ['ALU', 'AluJ', 'AluS', 'AluY', 'LINE1', 'SVA', 'HERV_K']
 const genotypes = ['1|1','1|0','0|1','1|.','.|1','multiple','1']
 
 const state = reactive({
@@ -276,6 +276,7 @@ function getUniqueRefLociCountRatio(m) {
 function getMEColor(me) {
     if (me == 'ALU') return "#1b9e77"
     if (me == 'LINE1') return "#d95f02"
+    if (me == 'HERV_K') return "#e39517"
     return "#7570b3"
 }
 
@@ -323,7 +324,7 @@ function getUCSCBrowserURL(mei) {
               <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Selected MEIs:</span>
                 <v-chip label size="large" color="black" class="font-weight-medium ml-4">{{ formatRatio(state.selected_meis.length, state.meis.length) }}</v-chip> 
                 <span class="text-h6 ml-2">total </span>
-                <span v-for="me_type in ['ALU', 'LINE1', 'SVA']" class="text-h6 ml-3 mr-4">
+                <span v-for="me_type in ['ALU', 'LINE1', 'SVA', 'HERV_K']" class="text-h6 ml-3 mr-4">
                     <v-chip label size="large" :disabled="!state.selected_mei_counts[me_type]" :color="getMEColor(me_type)" class="font-weight-medium">{{ getCountRatio(me_type) }}</v-chip>
                     {{ me_type }}</span>
               </div>
@@ -332,7 +333,7 @@ function getUCSCBrowserURL(mei) {
                 <v-icon large class="pr-2">mdi-tune</v-icon><span class="font-weight-medium mr-4">Unique ref loci:</span>
                 <v-chip label size="large" color="black" class="font-weight-medium ml-4">{{ formatRatio(state.n_selected_ref_loci, state.n_ref_loci) }}</v-chip> 
                 <span class="text-h6 ml-2">total </span>
-                <span v-for="me_type in ['ALU', 'LINE1', 'SVA']" class="text-h6 ml-3 mr-4">
+                <span v-for="me_type in ['ALU', 'LINE1', 'SVA', 'HERV_K']" class="text-h6 ml-3 mr-4">
                     <v-chip label size="large" :disabled="!state.selected_mei_counts[me_type]" :color="getMEColor(me_type)" class="font-weight-medium">{{ getUniqueRefLociCountRatio(me_type) }}</v-chip>
                     {{ me_type }}</span>
               </div>
@@ -347,7 +348,7 @@ function getUCSCBrowserURL(mei) {
                                         ME type(s):
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
-                                        <v-select v-model="state.selected_me_types" :items="['ALU', 'LINE1', 'SVA']" multiple hide-details clearable variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
+                                        <v-select v-model="state.selected_me_types" :items="['ALU', 'LINE1', 'SVA', 'HERV_K']" multiple hide-details clearable variant="outlined" density="compact" class="pa-0 ma-0 pb-2"></v-select>
                                     </v-col>
                                     <v-col cols="2" class="pa-0 ma-0 pl-3">
                                         

@@ -20,7 +20,8 @@
     'SVA': 1316,
     'SVA_A': 1387,
     'SVA_F': 1375,
-    'LINE1': 6019
+    'LINE1': 6019,
+    'HERV_K': 9472
   }
 
   const mei = props.mei
