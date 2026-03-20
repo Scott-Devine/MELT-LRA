@@ -339,6 +339,7 @@ function getUCSCBrowserURL(mei) {
               </div>
               
                 </v-card-title>
+                <v-card-text>
                 <v-container class="pa-0 ma-0 pt-2 pl-4">
                     <v-row class="pa-0 ma-0" fluid>
                         <v-col cols="12" class="pa-0 ma-0" fluid>
@@ -518,6 +519,7 @@ function getUCSCBrowserURL(mei) {
                         </v-col>
                     </v-row>
                 </v-container>
+                </v-card-text>
             </v-card>
             
             <!-- sortable table view -->
@@ -532,6 +534,7 @@ function getUCSCBrowserURL(mei) {
                 </div>
                 <EasyDataTable
                 ref="dataTable"
+                table-class-name="data-table"
                 :headers="state.headers"
                 :items="state.selected_meis"
                 alternating
@@ -594,6 +597,13 @@ function getUCSCBrowserURL(mei) {
 </template>
 
 <style scoped>
+.data-table {
+    --easy-table-header-font-size: 12pt;
+    --easy-table-body-row-font-size: 12pt;
+}
+.v-card-text {
+    font-size: 13pt;
+}
 div.tsd_div {
     display: inline-block;
     background-color: #a0ffa0;
