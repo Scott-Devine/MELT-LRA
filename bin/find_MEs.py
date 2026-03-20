@@ -31,7 +31,8 @@ ME_LENGTHS = {
     'SVA': 1316,    # MELT SVA reference
     'SVA_A': 1387,
     'SVA_F': 1375,
-    'LINE1': 6019
+    'LINE1': 6019,
+    'HERV_K': 9472,
 }
 
 # CSV output
@@ -1166,6 +1167,8 @@ def main():
     parser.add_argument('--sva_water_rev', required=True, help='Path to SVA water reverse strand alignment output file.')
     parser.add_argument('--line_water', required=True, help='Path to LINE1 water alignment output file.')
     parser.add_argument('--line_water_rev', required=True, help='Path to LINE1 water reverse strand alignment output file.')
+    parser.add_argument('--hervk_water', required=True, help='Path to HERV-k water alignment output file.')
+    parser.add_argument('--hervk_water_rev', required=True, help='Path to HERV-k water reverse strand alignment output file.')
     parser.add_argument('--min_seqlen', required=False, type=int, default=100, help='Minimum insertion sequence length.')
     parser.add_argument('--max_seqlen', required=False, type=int, default=50000, help='Maximum insertion sequence length.')
     parser.add_argument('--min_pctid', required=False, type=int, default=90, help='Minimum average percent identity of aligned regions.')
@@ -1229,6 +1232,11 @@ def main():
     line_rev_aligns = read_water(args.line_water_rev)
     info("read " + str(len(line_rev_aligns)) + " reverse strand LINE1 alignment(s) from " + args.line_water_rev)
 
+    hervk_aligns = read_water(args.hervk_water)
+    info("read " + str(len(hervk_aligns)) + " HERV-k alignment(s) from " + args.hervk_water)
+    hervk_rev_aligns = read_water(args.hervk_water_rev)
+    info("read " + str(len(hervk_rev_aligns)) + " reverse strand HERV-k alignment(s) from " + args.hervk_water_rev)
+
     # FASTA output for CALU
     alu_fasta = { 'fh': None, 'n': 0, 'path': args.alu_fasta }
     alu_fasta['fh'] = open(alu_fasta['path'], "w")
@@ -1268,13 +1276,16 @@ def main():
             warn(ins_position_str(vcf_ins) + " polyA and polyT both have score " + str(vcf_ins['polyA']['score']))
         
         # check for qualifying match with mobile element
+        hervk_match = check_insertion_for_ME_match(vcf_ins, hervk_aligns, args.min_pctid, args.min_pctcov, '+')
+        hervk_rev_match = check_insertion_for_ME_match(vcf_ins, hervk_rev_aligns, args.min_pctid, args.min_pctcov, '-')
         alu_match = check_insertion_for_ME_match(vcf_ins, alu_aligns, args.min_pctid, args.min_pctcov, '+')
         alu_rev_match = check_insertion_for_ME_match(vcf_ins, alu_rev_aligns, args.min_pctid, args.min_pctcov, '-')
         sva_match = check_insertion_for_ME_match(vcf_ins, sva_aligns, args.min_pctid, args.min_pctcov, '+')
         sva_rev_match = check_insertion_for_ME_match(vcf_ins, sva_rev_aligns, args.min_pctid, args.min_pctcov, '-')
         line_match = check_insertion_for_ME_match(vcf_ins, line_aligns, args.min_pctid, args.min_pctcov, '+')
         line_rev_match = check_insertion_for_ME_match(vcf_ins, line_rev_aligns, args.min_pctid, args.min_pctcov, '-')
-        matches = [m for m in [alu_match, alu_rev_match, sva_match, sva_rev_match, line_match, line_rev_match] if m is not None]
+
+        matches = [m for m in [alu_match, alu_rev_match, sva_match, sva_rev_match, line_match, line_rev_match, hervk_match, hervk_rev_match] if m is not None]
         n_matches = len(matches)
 
         # sort matches and pick the highest-scoring
@@ -1294,6 +1305,7 @@ def main():
             alu_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, alu_aligns, alu_rev_aligns, args.min_pctid, args.min_pctcov)
             sva_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, sva_aligns, sva_rev_aligns, args.min_pctid, args.min_pctcov)
             line1_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, line_aligns, line_rev_aligns, args.min_pctid, args.min_pctcov)
+            hervk_matches = check_insertion_for_5_prime_inverted_ME_match(vcf_ins, hervk_aligns, hervk_rev_aligns, args.min_pctid, args.min_pctcov)
 
             if line1_matches is not None:
                 inv_matches = line1_matches
@@ -1301,6 +1313,8 @@ def main():
                 inv_matches = alu_matches
             elif sva_matches is not None:
                 inv_matches = sva_matches
+            elif hervk_matches is not None:
+                inv_matches = hervk_matches
 
             # add both matches
             if inv_matches is not None:
