@@ -146,7 +146,7 @@
 
   // L1s only - find ORFs
   let orfs = []
-  if (mei.ME == 'LINE1') {
+  if ((mei.ME == 'LINE1') || (mei.ME == 'HERV_K')) {
     orfs = findOrfs(mei['insertion_seq'])
     orfs.forEach(o => {
       o.x1 = ins_xscale(o.start)
