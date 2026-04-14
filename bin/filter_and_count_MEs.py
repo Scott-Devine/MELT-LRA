@@ -453,6 +453,12 @@ def main():
     parser.add_argument('--line_min_pctid', required=False, default=0, help='Minimum LINE average percent identity of aligned regions.')
     parser.add_argument('--line_min_pctcov', required=False, default=0, help='Minimum LINE percent coverage of insertion minus TSD and polyX by aligned regions.')
 
+    # HERV-k filters
+    parser.add_argument('--hervk_excluded_repeat_types', required=False, help='Exclude/filter HERV-ks whose overlapping repeat type is in this list.')
+    parser.add_argument('--hervk_min_polyA_bp', required=False, default=0, help='Minimum HERV-k polyA/polyT length.')
+    parser.add_argument('--hervk_min_pctid', required=False, default=0, help='Minimum HERV-k average percent identity of aligned regions.')
+    parser.add_argument('--hervk_min_pctcov', required=False, default=0, help='Minimum HERV-k percent coverage of insertion minus TSD and polyX by aligned regions.')
+
     parser.add_argument('--merge_by_position', required=False, action=argparse.BooleanOptionalAction, help='Whether to merge loci by position in the *-samples*.csv files.')
     
     args = parser.parse_args()
@@ -466,21 +472,25 @@ def main():
     ex_sva_rep_types_d = list_to_dict(args.sva_excluded_repeat_types)
     ex_alu_rep_types_d = list_to_dict(args.alu_excluded_repeat_types)
     ex_line_rep_types_d = list_to_dict(args.line_excluded_repeat_types)
+    ex_hervk_rep_types_d = list_to_dict(args.hervk_excluded_repeat_types)
 
     # min polyA length
     sva_min_polya = float(args.sva_min_polyA_bp)
     alu_min_polya = float(args.alu_min_polyA_bp)
     line_min_polya = float(args.line_min_polyA_bp)
+    hervk_min_polya = float(args.hervk_min_polyA_bp)
 
     # min_pctcov
     sva_min_pctcov = float(args.sva_min_pctcov)
     alu_min_pctcov = float(args.alu_min_pctcov)
     line_min_pctcov = float(args.line_min_pctcov)
+    hervk_min_pctcov = float(args.hervk_min_pctcov)
 
     # min_pctid
     sva_min_pctid = float(args.sva_min_pctid)
     alu_min_pctid = float(args.alu_min_pctid)
     line_min_pctid = float(args.line_min_pctid)
+    hervk_min_pctid = float(args.hervk_min_pctid)
     
     filters = {
         'SVA': { 'repeat_types': ex_sva_rep_types_d,
@@ -497,6 +507,11 @@ def main():
                    'min_polya': line_min_polya,
                    'min_pctcov': line_min_pctcov,
                    'min_pctid': line_min_pctid
+                  },
+        'HERV_K': { 'repeat_types': ex_hervk_rep_types_d,
+                   'min_polya': hervk_min_polya,
+                   'min_pctcov': hervk_min_pctcov,
+                   'min_pctid': hervk_min_pctid
                   }
     }
         

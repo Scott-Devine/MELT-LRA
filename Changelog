@@ -5,6 +5,7 @@ v1.4.2
  -Add ability to link out to UCSC genome browser from MEI viewer.
  -Add HERV-k reference, --hervk_water and --hervk_water_rev arguments to find_MEs.py
  -Add HERV-k MEI type to MEI viewer.
+ -Display ORFs for both LINE1 and HERV-k MEIs.
 
 v1.4.1 (November 2, 2023)
  -Update MEI viewer to accommodate output from filter_and_count_MEs.py
