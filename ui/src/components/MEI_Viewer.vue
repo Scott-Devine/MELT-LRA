@@ -472,7 +472,7 @@ function getUCSCBrowserURL(mei) {
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0 pt-1 pr-3 text-right">
-                                        Number of overlapping hg38 repeats:
+                                        Number of overlapping repeats:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-range-slider v-model="state.overlapping_repeats_range" :min="0" :max="10" :step="1" thumb-label hide-details></v-range-slider>
@@ -484,7 +484,7 @@ function getUCSCBrowserURL(mei) {
                                 
                                 <v-row class="pa-0 ma-0">
                                     <v-col cols="3" class="pa-0 ma-0 pt-2 pr-3 text-right">
-                                        Overlapping hg38 repeat family:
+                                        Overlapping repeat family:
                                     </v-col>
                                     <v-col cols="8" class="pa-0 ma-0">
                                         <v-select v-model="state.selected_overlapping_rep_fams" :items="state.overlapping_rep_fams" multiple hide-details variant="outlined" density="compact" class="pa-0 ma-0 pb-2">
@@ -561,7 +561,7 @@ function getUCSCBrowserURL(mei) {
                             <div class="hap_div pa-1 my-1 font-weight-bold">genotype</div> {{ item.genotype }} 
                             <div class="tsd_div pa-1 my-1 ml-3 font-weight-bold">TSD</div> {{ item.TSD_seq }}
 
-                            <div v-if="item.overlapping_annots.length > 0" class="repeat_div ml-3 pa-1 my-1 mr-2 font-weight-bold">overlapping hg38 repeats</div>
+                            <div v-if="item.overlapping_annots.length > 0" class="repeat_div ml-3 pa-1 my-1 mr-2 font-weight-bold">overlapping repeats</div>
                             <span v-for="(annot, anum) in item.overlapping_annots">{{ annot }}</span>
                             <br>
                           
